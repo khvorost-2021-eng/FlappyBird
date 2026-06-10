@@ -56,13 +56,9 @@ const settings = {
 
 (function loadLocalData() {
     const saved = localStorage.getItem('flappyPlayer');
-    if (saved) {
-        try { Object.assign(gameState, JSON.parse(saved)); } catch (e) {}
-    }
+    if (saved) { try { Object.assign(gameState, JSON.parse(saved)); } catch (e) {} }
     const savedSettings = localStorage.getItem('flappySettings');
-    if (savedSettings) {
-        try { Object.assign(settings, JSON.parse(savedSettings)); } catch (e) {}
-    }
+    if (savedSettings) { try { Object.assign(settings, JSON.parse(savedSettings)); } catch (e) {} }
 })();
 
 // ==========================================
@@ -313,7 +309,7 @@ const SKINS = {
 };
 
 // ==========================================
-// ИГРА
+// ИГРА (FIXED TIMESTEP + requestAnimationFrame)
 // ==========================================
 class FlappyGame {
     constructor() {
@@ -330,22 +326,25 @@ class FlappyGame {
         this.offsetX = 0;
         this.offsetY = 0;
         
-        // Видимая область в виртуальных координатах
         this.visibleLeft = 0;
         this.visibleRight = this.VIRTUAL_WIDTH;
         this.visibleWidth = this.VIRTUAL_WIDTH;
-        
-        // Дисплейные размеры (CSS пиксели)
         this.displayWidth = 400;
         this.displayHeight = 600;
         
-        this.gravity = 0.15;
-        this.jumpStrength = -5;
+        // ⚡ ВОЗВРАЩЁННАЯ МЕХАНИКА (как в рабочей версии)
+        this.gravity = 0.3;
+        this.jumpStrength = -7.5;
         this.terminalVelocity = 10;
         this.pipeGap = 180;
         this.pipeWidth = 60;
-        this.pipeSpeed = 2;
+        this.pipeSpeed = 6;
         this.pipeInterval = 110;
+        
+        // ⚡ FIXED TIMESTEP (логика обновляется 60 раз в секунду)
+        this.FIXED_DT = 1 / 60;
+        this.accumulator = 0;
+        this.lastTime = null;
         
         this.bird = { x: 80, y: 300, velocity: 0, radius: 15 };
         this.pipes = [];
@@ -357,6 +356,7 @@ class FlappyGame {
         this.earnedCoins = 0;
         this.pipesPassed = 0;
         this.frameCount = 0;
+        
         this.gameRunning = false;
         this.gameStarted = false;
         this.animationId = null;
@@ -376,20 +376,18 @@ class FlappyGame {
         YandexAPI.init().catch(() => {});
     }
     
-    // Генерация облаков в широком диапазоне
     generateClouds() {
         this.clouds = [];
         for (let i = 0; i < 8; i++) {
             this.clouds.push({
                 baseX: i * 150 + Math.random() * 50,
                 y: 30 + i * 70 + Math.random() * 30,
-                speed: 0.2 + Math.random() * 0.2,
+                speed: 0.3 + Math.random() * 0.2,
                 scale: 0.7 + Math.random() * 0.5
             });
         }
     }
     
-    // Генерация звёзд в экранных координатах
     generateStars() {
         this.stars = [];
         for (let i = 0; i < 150; i++) {
@@ -398,7 +396,7 @@ class FlappyGame {
                 y: Math.random() * this.displayHeight * 0.85,
                 size: Math.random() * 2 + 0.5,
                 twinkle: Math.random() * Math.PI * 2,
-                speed: 0.02 + Math.random() * 0.05
+                speed: 0.03 + Math.random() * 0.05
             });
         }
     }
@@ -498,16 +496,9 @@ class FlappyGame {
         window.addEventListener('orientationchange', () => setTimeout(() => this.handleResize(), 100));
     }
     
-    updateSliderProgress(slider) {
-        slider.style.setProperty('--progress', slider.value + '%');
-    }
-    updateMuteButton(btn, muted) {
-        if (muted) btn.classList.add('muted');
-        else btn.classList.remove('muted');
-    }
-    saveSettings() {
-        try { localStorage.setItem('flappySettings', JSON.stringify(settings)); } catch (e) {}
-    }
+    updateSliderProgress(slider) { slider.style.setProperty('--progress', slider.value + '%'); }
+    updateMuteButton(btn, muted) { if (muted) btn.classList.add('muted'); else btn.classList.remove('muted'); }
+    saveSettings() { try { localStorage.setItem('flappySettings', JSON.stringify(settings)); } catch (e) {} }
     
     handleResize() {
         if (!this.canvas) return;
@@ -527,20 +518,15 @@ class FlappyGame {
         
         this.scaleX = this.displayWidth / this.VIRTUAL_WIDTH;
         this.scaleY = this.displayHeight / this.VIRTUAL_HEIGHT;
-        
-        // Масштабируем по высоте, чтобы игра помещалась
         this.scale = this.scaleY;
         this.offsetX = (this.displayWidth - this.VIRTUAL_WIDTH * this.scale) / 2;
         this.offsetY = 0;
         
-        // ✅ КЛЮЧЕВОЕ: вычисляем видимую область в виртуальных координатах
         this.visibleLeft = -this.offsetX / this.scale;
         this.visibleRight = (this.displayWidth - this.offsetX) / this.scale;
         this.visibleWidth = this.visibleRight - this.visibleLeft;
         
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        
-        // Перегенерируем звёзды под новый размер экрана
         this.generateStars();
     }
     
@@ -566,12 +552,8 @@ class FlappyGame {
         
         if (screenId !== 'gameScreen' && this.gameRunning) this.stopGame();
         
-        if (screenId !== 'menuScreen' && this.menuAnimId) {
-            cancelAnimationFrame(this.menuAnimId); this.menuAnimId = null;
-        }
-        if (screenId !== 'skinsScreen' && this.skinPreviewAnimId) {
-            cancelAnimationFrame(this.skinPreviewAnimId); this.skinPreviewAnimId = null;
-        }
+        if (screenId !== 'menuScreen' && this.menuAnimId) { cancelAnimationFrame(this.menuAnimId); this.menuAnimId = null; }
+        if (screenId !== 'skinsScreen' && this.skinPreviewAnimId) { cancelAnimationFrame(this.skinPreviewAnimId); this.skinPreviewAnimId = null; }
         if (screenId !== 'settingsScreen') {
             this.themePreviewAnimIds.forEach(id => cancelAnimationFrame(id));
             this.themePreviewAnimIds.clear();
@@ -598,10 +580,8 @@ class FlappyGame {
         if (this.animationId) { cancelAnimationFrame(this.animationId); this.animationId = null; }
     }
     updateAllCoinDisplays() {
-        const c = document.getElementById('coinCount');
-        if (c) c.textContent = gameState.coins;
-        const s = document.getElementById('coinCountSkins');
-        if (s) s.textContent = gameState.coins;
+        const c = document.getElementById('coinCount'); if (c) c.textContent = gameState.coins;
+        const s = document.getElementById('coinCountSkins'); if (s) s.textContent = gameState.coins;
     }
     
     renderSettingsScreen() {
@@ -609,16 +589,8 @@ class FlappyGame {
         const ss = document.getElementById('sfxSlider');
         const mt = document.getElementById('musicToggle');
         const st = document.getElementById('sfxToggle');
-        if (ms) {
-            ms.value = settings.musicVolume * 100;
-            this.updateSliderProgress(ms);
-            document.getElementById('musicValue').textContent = Math.round(settings.musicVolume * 100) + '%';
-        }
-        if (ss) {
-            ss.value = settings.sfxVolume * 100;
-            this.updateSliderProgress(ss);
-            document.getElementById('sfxValue').textContent = Math.round(settings.sfxVolume * 100) + '%';
-        }
+        if (ms) { ms.value = settings.musicVolume * 100; this.updateSliderProgress(ms); document.getElementById('musicValue').textContent = Math.round(settings.musicVolume * 100) + '%'; }
+        if (ss) { ss.value = settings.sfxVolume * 100; this.updateSliderProgress(ss); document.getElementById('sfxValue').textContent = Math.round(settings.sfxVolume * 100) + '%'; }
         if (mt) this.updateMuteButton(mt, settings.musicMuted);
         if (st) this.updateMuteButton(st, settings.sfxMuted);
         
@@ -632,14 +604,11 @@ class FlappyGame {
             const card = document.createElement('div');
             card.className = 'theme-card';
             if (k === gameState.theme) card.classList.add('selected');
-            const cvs = document.createElement('canvas');
-            cvs.width = 200; cvs.height = 160;
+            const cvs = document.createElement('canvas'); cvs.width = 200; cvs.height = 160;
             card.appendChild(cvs);
-            const lbl = document.createElement('div');
-            lbl.className = 'theme-label'; lbl.textContent = theme.name;
+            const lbl = document.createElement('div'); lbl.className = 'theme-label'; lbl.textContent = theme.name;
             card.appendChild(lbl);
-            const chk = document.createElement('div');
-            chk.className = 'theme-check'; chk.textContent = '✓';
+            const chk = document.createElement('div'); chk.className = 'theme-check'; chk.textContent = '✓';
             card.appendChild(chk);
             card.addEventListener('click', () => this.selectTheme(k));
             grid.appendChild(card);
@@ -654,60 +623,47 @@ class FlappyGame {
         const render = () => {
             const ss = document.getElementById('settingsScreen');
             if (!ss || !ss.classList.contains('active')) { this.themePreviewAnimIds.delete(canvas); return; }
+            
             const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
             g.addColorStop(0, theme.skyTop); g.addColorStop(1, theme.skyBottom);
             ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
             if (theme.hasStars) {
                 ctx.fillStyle = 'white';
                 for (let i = 0; i < 20; i++) {
                     const tw = Math.sin(frame * 0.1 + i) * 0.5 + 0.5;
                     ctx.globalAlpha = tw;
-                    const sx = (i * 37) % canvas.width;
-                    const sy = (i * 23) % (canvas.height * 0.6);
-                    ctx.beginPath(); ctx.arc(sx, sy, 1 + tw, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc((i * 37) % canvas.width, (i * 23) % (canvas.height * 0.6), 1 + tw, 0, Math.PI * 2); ctx.fill();
                 }
                 ctx.globalAlpha = 1;
             }
-            if (theme.hasSun) {
-                ctx.fillStyle = theme.sunColor;
-                ctx.beginPath(); ctx.arc(canvas.width - 35, 35, 18, 0, Math.PI * 2); ctx.fill();
-            }
-            if (theme.hasMoon) {
-                ctx.fillStyle = theme.moonColor;
-                ctx.beginPath(); ctx.arc(canvas.width - 35, 35, 15, 0, Math.PI * 2); ctx.fill();
-            }
+            if (theme.hasSun) { ctx.fillStyle = theme.sunColor; ctx.beginPath(); ctx.arc(canvas.width - 35, 35, 18, 0, Math.PI * 2); ctx.fill(); }
+            if (theme.hasMoon) { ctx.fillStyle = theme.moonColor; ctx.beginPath(); ctx.arc(canvas.width - 35, 35, 15, 0, Math.PI * 2); ctx.fill(); }
+            
             ctx.fillStyle = theme.cloudColor;
-            const cx = (frame * 0.3) % (canvas.width + 50) - 25;
-            ctx.beginPath(); ctx.arc(cx, 50, 10, 0, Math.PI * 2);
-            ctx.arc(cx + 10, 50, 13, 0, Math.PI * 2);
-            ctx.arc(cx + 22, 50, 10, 0, Math.PI * 2); ctx.fill();
+            const cx = ((frame * 0.3) % (canvas.width + 50)) - 25;
+            ctx.beginPath(); ctx.arc(cx, 50, 10, 0, Math.PI * 2); ctx.arc(cx + 10, 50, 13, 0, Math.PI * 2); ctx.arc(cx + 22, 50, 10, 0, Math.PI * 2); ctx.fill();
+            
             if (theme.hasTrees) {
                 for (let i = 0; i < 3; i++) {
-                    const tx = (i * 70 + frame * 0.5) % (canvas.width + 50) - 25;
-                    ctx.fillStyle = theme.pipeMain;
-                    ctx.fillRect(tx, canvas.height - 60, 25, 60);
-                    ctx.fillStyle = theme.pipeDark;
-                    ctx.fillRect(tx - 3, canvas.height - 68, 31, 8);
+                    const tx = ((i * 70 + frame * 0.5) % (canvas.width + 50)) - 25;
+                    ctx.fillStyle = theme.pipeMain; ctx.fillRect(tx, canvas.height - 60, 25, 60);
+                    ctx.fillStyle = theme.pipeDark; ctx.fillRect(tx - 3, canvas.height - 68, 31, 8);
                 }
             } else {
                 for (let i = 0; i < 2; i++) {
-                    const px = (i * 100 + frame * 0.5) % (canvas.width + 50) - 25;
-                    const th = 40 + i * 10;
-                    const by = th + 50;
-                    ctx.fillStyle = theme.pipeMain;
-                    ctx.fillRect(px, 0, 25, th);
-                    ctx.fillRect(px, by, 25, canvas.height - by);
-                    ctx.fillStyle = theme.pipeTop;
-                    ctx.fillRect(px - 3, th - 8, 31, 8);
-                    ctx.fillRect(px - 3, by, 31, 8);
+                    const px = ((i * 100 + frame * 0.5) % (canvas.width + 50)) - 25;
+                    const th = 40 + i * 10; const by = th + 50;
+                    ctx.fillStyle = theme.pipeMain; ctx.fillRect(px, 0, 25, th); ctx.fillRect(px, by, 25, canvas.height - by);
+                    ctx.fillStyle = theme.pipeTop; ctx.fillRect(px - 3, th - 8, 31, 8); ctx.fillRect(px - 3, by, 31, 8);
                 }
             }
-            ctx.fillStyle = theme.ground;
-            ctx.fillRect(0, canvas.height - 8, canvas.width, 8);
+            ctx.fillStyle = theme.ground; ctx.fillRect(0, canvas.height - 8, canvas.width, 8);
+            
             frame++;
             this.themePreviewAnimIds.set(canvas, requestAnimationFrame(render));
         };
-        render();
+        requestAnimationFrame(render);
     }
     
     async selectTheme(k) {
@@ -724,51 +680,39 @@ class FlappyGame {
         const render = () => {
             const ms = document.getElementById('menuScreen');
             if (!ms || !ms.classList.contains('active')) { this.menuAnimId = null; return; }
+            
             this.menuCtx.clearRect(0, 0, this.menuCanvas.width, this.menuCanvas.height);
             const theme = THEMES[gameState.theme] || THEMES.day;
             const g = this.menuCtx.createLinearGradient(0, 0, 0, this.menuCanvas.height);
             g.addColorStop(0, theme.skyTop); g.addColorStop(1, theme.skyBottom);
-            this.menuCtx.fillStyle = g;
-            this.menuCtx.fillRect(0, 0, this.menuCanvas.width, this.menuCanvas.height);
-            if (theme.hasSun) {
-                this.menuCtx.fillStyle = theme.sunColor;
-                this.menuCtx.beginPath();
-                this.menuCtx.arc(this.menuCanvas.width - 50, 50, 22, 0, Math.PI * 2);
-                this.menuCtx.fill();
-            }
-            if (theme.hasMoon) {
-                this.menuCtx.fillStyle = theme.moonColor;
-                this.menuCtx.beginPath();
-                this.menuCtx.arc(this.menuCanvas.width - 50, 50, 18, 0, Math.PI * 2);
-                this.menuCtx.fill();
-            }
+            this.menuCtx.fillStyle = g; this.menuCtx.fillRect(0, 0, this.menuCanvas.width, this.menuCanvas.height);
+            
+            if (theme.hasSun) { this.menuCtx.fillStyle = theme.sunColor; this.menuCtx.beginPath(); this.menuCtx.arc(this.menuCanvas.width - 50, 50, 22, 0, Math.PI * 2); this.menuCtx.fill(); }
+            if (theme.hasMoon) { this.menuCtx.fillStyle = theme.moonColor; this.menuCtx.beginPath(); this.menuCtx.arc(this.menuCanvas.width - 50, 50, 18, 0, Math.PI * 2); this.menuCtx.fill(); }
+            
             this.menuCtx.fillStyle = theme.cloudColor;
             for (let i = 0; i < 3; i++) {
-                const x = (frame * 0.5 + i * 120) % (this.menuCanvas.width + 100) - 50;
+                const x = ((frame * 0.5 + i * 120) % (this.menuCanvas.width + 100)) - 50;
                 const y = 40 + i * 50;
-                this.menuCtx.beginPath();
-                this.menuCtx.arc(x, y, 18, 0, Math.PI * 2);
-                this.menuCtx.arc(x + 18, y, 22, 0, Math.PI * 2);
-                this.menuCtx.arc(x + 38, y, 18, 0, Math.PI * 2);
-                this.menuCtx.fill();
+                this.menuCtx.beginPath(); this.menuCtx.arc(x, y, 18, 0, Math.PI * 2); this.menuCtx.arc(x + 18, y, 22, 0, Math.PI * 2); this.menuCtx.arc(x + 38, y, 18, 0, Math.PI * 2); this.menuCtx.fill();
             }
             this.menuCtx.fillStyle = theme.ground;
             this.menuCtx.fillRect(0, this.menuCanvas.height - 10, this.menuCanvas.width, 10);
+            
             this.menuCtx.save();
             this.menuCtx.translate(this.menuCanvas.width / 2, this.menuCanvas.height / 2);
             this.menuCtx.scale(1.8, 1.8);
-            const t = frame * 0.08;
             const by = Math.sin(frame * 0.05) * 15;
             this.menuCtx.translate(0, by);
-            const oc = this.ctx;
-            this.ctx = this.menuCtx;
-            try { this.drawSkin(t, gameState.currentSkin); } catch (e) {}
+            const oc = this.ctx; this.ctx = this.menuCtx;
+            try { this.drawSkin(frame * 0.08, gameState.currentSkin); } catch (e) {}
             this.ctx = oc;
             this.menuCtx.restore();
+            
             frame++;
             this.menuAnimId = requestAnimationFrame(render);
         };
-        render();
+        requestAnimationFrame(render);
     }
     
     renderSkinsGrid() {
@@ -782,62 +726,41 @@ class FlappyGame {
             const card = document.createElement('div');
             card.className = 'skin-card';
             if (k === gameState.currentSkin) card.classList.add('selected');
-            const p = document.createElement('canvas');
-            p.className = 'skin-preview'; p.width = 80; p.height = 80;
-            canvases.push({ canvas: p, skinKey: k });
-            card.appendChild(p);
-            const n = document.createElement('div');
-            n.className = 'skin-name'; n.textContent = skin.name;
-            card.appendChild(n);
-            const pr = document.createElement('div');
-            pr.className = 'skin-price';
-            pr.textContent = skin.price === 0 ? T.free : `🪙 ${skin.price}`;
-            card.appendChild(pr);
-            const btn = document.createElement('button');
-            btn.className = 'skin-btn';
-            if (k === gameState.currentSkin) {
-                btn.textContent = T.selected; btn.classList.add('selected'); btn.disabled = true;
-            } else if (gameState.ownedSkins.includes(k)) {
-                btn.textContent = T.select; btn.classList.add('select');
-                btn.addEventListener('click', (e) => { e.stopPropagation(); this.selectSkin(k); });
-            } else {
-                btn.textContent = `${T.buy} 🪙${skin.price}`; btn.classList.add('buy');
-                if (gameState.coins < skin.price) btn.disabled = true;
-                else btn.addEventListener('click', (e) => { e.stopPropagation(); this.buySkin(k); });
-            }
-            card.appendChild(btn);
-            grid.appendChild(card);
+            const p = document.createElement('canvas'); p.className = 'skin-preview'; p.width = 80; p.height = 80;
+            canvases.push({ canvas: p, skinKey: k }); card.appendChild(p);
+            const n = document.createElement('div'); n.className = 'skin-name'; n.textContent = skin.name; card.appendChild(n);
+            const pr = document.createElement('div'); pr.className = 'skin-price'; pr.textContent = skin.price === 0 ? T.free : `🪙 ${skin.price}`; card.appendChild(pr);
+            const btn = document.createElement('button'); btn.className = 'skin-btn';
+            if (k === gameState.currentSkin) { btn.textContent = T.selected; btn.classList.add('selected'); btn.disabled = true; }
+            else if (gameState.ownedSkins.includes(k)) { btn.textContent = T.select; btn.classList.add('select'); btn.addEventListener('click', (e) => { e.stopPropagation(); this.selectSkin(k); }); }
+            else { btn.textContent = `${T.buy} 🪙${skin.price}`; btn.classList.add('buy'); if (gameState.coins < skin.price) btn.disabled = true; else btn.addEventListener('click', (e) => { e.stopPropagation(); this.buySkin(k); }); }
+            card.appendChild(btn); grid.appendChild(card);
         });
         this.startAllSkinPreviews(canvases);
     }
     
     startAllSkinPreviews(canvases) {
-        const ctxs = canvases.map(({ canvas, skinKey }) => ({
-            ctx: canvas.getContext('2d'), canvas, skinKey
-        }));
+        const ctxs = canvases.map(({ canvas, skinKey }) => ({ ctx: canvas.getContext('2d'), canvas, skinKey }));
         let frame = 0;
         const render = () => {
             const ss = document.getElementById('skinsScreen');
             if (!ss || !ss.classList.contains('active')) { this.skinPreviewAnimId = null; return; }
+            
             ctxs.forEach(({ ctx, canvas, skinKey }) => {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 const theme = THEMES[gameState.theme] || THEMES.day;
                 const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
                 g.addColorStop(0, theme.skyTop); g.addColorStop(1, theme.skyBottom);
                 ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.save();
-                ctx.translate(canvas.width / 2, canvas.height / 2);
-                ctx.scale(1.4, 1.4);
-                const oc = this.ctx;
-                this.ctx = ctx;
+                ctx.save(); ctx.translate(canvas.width / 2, canvas.height / 2); ctx.scale(1.4, 1.4);
+                const oc = this.ctx; this.ctx = ctx;
                 try { this.drawSkin(frame * 0.08, skinKey); } catch (e) {}
-                this.ctx = oc;
-                ctx.restore();
+                this.ctx = oc; ctx.restore();
             });
             frame++;
             this.skinPreviewAnimId = requestAnimationFrame(render);
         };
-        render();
+        requestAnimationFrame(render);
     }
     
     async buySkin(k) {
@@ -847,8 +770,7 @@ class FlappyGame {
         if (!gameState.ownedSkins.includes(k)) gameState.ownedSkins.push(k);
         gameState.currentSkin = k;
         await YandexAPI.savePlayerData(gameState);
-        this.updateAllCoinDisplays();
-        this.renderSkinsGrid();
+        this.updateAllCoinDisplays(); this.renderSkinsGrid();
     }
     async selectSkin(k) {
         gameState.currentSkin = k;
@@ -856,47 +778,75 @@ class FlappyGame {
         this.renderSkinsGrid();
     }
     
+    // ⚡ ЗАПУСК ИГРЫ (requestAnimationFrame + fixed timestep)
     startGame() {
         this.showScreen('gameScreen');
         setTimeout(() => this.resizeCanvas(), 50);
         this.resetGame();
         this.gameRunning = true;
         this.gameStarted = false;
-        const h = document.getElementById('tapHint');
-        if (h) h.classList.remove('hidden');
-        const b = document.getElementById('gameBackBtn');
-        if (b) b.classList.remove('game-hidden');
+        const h = document.getElementById('tapHint'); if (h) h.classList.remove('hidden');
+        const b = document.getElementById('gameBackBtn'); if (b) b.classList.remove('game-hidden');
         SoundManager.resume();
-        this.frameCount = this.pipeInterval - 30;
-        this.gameLoop();
+        
+        // ⚡ Сбрасываем время и аккумулятор для корректного первого кадра
+        this.lastTime = null;
+        this.accumulator = 0;
+        
+        this.gameLoop(performance.now());
     }
     
     resetGame() {
         this.bird = { x: 80, y: 300, velocity: 0, radius: 15 };
-        this.pipes = [];
-        this.coins = [];
-        this.particles = [];
-        this.score = 0;
-        this.earnedCoins = 0;
-        this.pipesPassed = 0;
-        this.frameCount = 0;
-        const s = document.getElementById('score');
-        if (s) s.textContent = '0';
-        const c = document.getElementById('gameCoinCount');
-        if (c) c.textContent = '0';
+        this.pipes = []; this.coins = []; this.particles = [];
+        this.score = 0; this.earnedCoins = 0; this.pipesPassed = 0;
+        this.frameCount = this.pipeInterval - 30; // Первая труба скоро
+        const s = document.getElementById('score'); if (s) s.textContent = '0';
+        const c = document.getElementById('gameCoinCount'); if (c) c.textContent = '0';
     }
     
-    gameLoop() {
+    // ⚡ ГЛАВНЫЙ ЦИКЛ: requestAnimationFrame + Fixed Timestep
+    // Это стандартный паттерн "Fix Your Timestep" от Glenn Fiedler
+    gameLoop(timestamp) {
         if (!this.gameRunning) return;
-        try {
+        
+        // Инициализация lastTime на первом кадре
+        if (this.lastTime === null) {
+            this.lastTime = timestamp;
+            this.animationId = requestAnimationFrame((t) => this.gameLoop(t));
+            this.render(); // Рендерим стартовое состояние
+            return;
+        }
+        
+        // Вычисляем реальное прошедшее время
+        let dt = (timestamp - this.lastTime) / 1000;
+        this.lastTime = timestamp;
+        
+        // ⚡ Защита от больших скачков при сворачивании вкладки
+        // Максимум "перематываем" 0.1 секунды игры
+        if (dt > 0.1) dt = 0.1;
+        
+        // Добавляем в аккумулятор
+        this.accumulator += dt;
+        
+        // ⚡ Обновляем логику фиксированными шагами (каждый = 1/60 секунды)
+        // Это гарантирует, что механика работает одинаково на любом FPS
+        while (this.accumulator >= this.FIXED_DT) {
             this.update();
+            this.accumulator -= this.FIXED_DT;
+        }
+        
+        // ⚡ Рендерим текущее состояние (один раз за кадр для плавности)
+        try {
             this.render();
         } catch (err) {
-            console.error('Game loop error:', err);
+            console.error('Render error:', err);
         }
-        this.animationId = requestAnimationFrame(() => this.gameLoop());
+        
+        this.animationId = requestAnimationFrame((t) => this.gameLoop(t));
     }
     
+    // ⚡ СТАРАЯ РАБОЧАЯ МЕХАНИКА (один тик = 1/60 секунды)
     update() {
         this.frameCount++;
         
@@ -905,31 +855,42 @@ class FlappyGame {
             return;
         }
         
+        // Физика птицы
         this.bird.velocity += this.gravity;
-        if (this.bird.velocity > this.terminalVelocity) this.bird.velocity = this.terminalVelocity;
+        if (this.bird.velocity > this.terminalVelocity) {
+            this.bird.velocity = this.terminalVelocity;
+        }
         this.bird.y += this.bird.velocity;
         
+        // Спавн труб
         if (this.frameCount % this.pipeInterval === 0) {
             this.addPipe();
             this.pipesPassed++;
-            if (this.pipesPassed % 3 === 0 || this.pipesPassed % 4 === 0) this.addCoin();
+            if (this.pipesPassed % 3 === 0 || this.pipesPassed % 4 === 0) {
+                this.addCoin();
+            }
         }
         
-        // ✅ Удаление труб за ЛЕВЫМ краем ВИДИМОЙ области
+        // Движение труб
         for (let i = this.pipes.length - 1; i >= 0; i--) {
             const pipe = this.pipes[i];
             pipe.x -= this.pipeSpeed;
+            
             if (this.checkCollision(pipe)) { this.gameOver(); return; }
+            
             if (!pipe.passed && pipe.x + this.pipeWidth < this.bird.x) {
                 pipe.passed = true;
                 this.score++;
                 document.getElementById('score').textContent = this.score;
             }
+            
+            // Удаление за левым краем видимой области
             if (pipe.x + this.pipeWidth < this.visibleLeft - 50) {
                 this.pipes.splice(i, 1);
             }
         }
         
+        // Движение монет
         for (let i = this.coins.length - 1; i >= 0; i--) {
             const coin = this.coins[i];
             coin.x -= this.pipeSpeed;
@@ -949,14 +910,18 @@ class FlappyGame {
             }
         }
         
+        // Частицы
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
-            p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life--;
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.15;
+            p.life--;
             if (p.life <= 0) this.particles.splice(i, 1);
         }
         
-        if (this.bird.y + this.bird.radius > this.VIRTUAL_HEIGHT ||
-            this.bird.y - this.bird.radius < 0) {
+        // Границы
+        if (this.bird.y + this.bird.radius > this.VIRTUAL_HEIGHT || this.bird.y - this.bird.radius < 0) {
             this.gameOver();
         }
     }
@@ -965,8 +930,6 @@ class FlappyGame {
         const min = 60;
         const max = this.VIRTUAL_HEIGHT - this.pipeGap - min;
         const top = Math.random() * (max - min) + min;
-        
-        // ✅ Труба создаётся ЗА правым краем ВИДИМОЙ области
         this.pipes.push({
             x: this.visibleRight + this.pipeWidth,
             topHeight: top,
@@ -1031,10 +994,7 @@ class FlappyGame {
         const inTop = players.some(p => p.uniqueId === gameState.uniqueId);
         let all = [...players];
         if (!inTop && gameState.bestScore > 0) {
-            all.push({
-                rank: null, name: gameState.name + ' (ВЫ)',
-                score: gameState.bestScore, uniqueId: gameState.uniqueId, isPlayer: true
-            });
+            all.push({ rank: null, name: gameState.name + ' (ВЫ)', score: gameState.bestScore, uniqueId: gameState.uniqueId, isPlayer: true });
         }
         all.sort((a, b) => b.score - a.score);
         all = all.slice(0, 11);
@@ -1049,59 +1009,48 @@ class FlappyGame {
     }
     
     // ==========================================
-    // РЕНДЕР
+    // РЕНДЕР (как в рабочей версии)
     // ==========================================
     render() {
         const theme = THEMES[gameState.theme] || THEMES.day;
         const ctx = this.ctx;
         
-        // 1. ФОН на весь canvas (БЕЗ масштабирования)
+        // Фон
         const g = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
-        g.addColorStop(0, theme.skyTop);
-        g.addColorStop(1, theme.skyBottom);
-        ctx.fillStyle = g;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        g.addColorStop(0, theme.skyTop); g.addColorStop(1, theme.skyBottom);
+        ctx.fillStyle = g; ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // 2. ЗВЁЗДЫ — рисуем БЕЗ масштабирования (в экранных координатах)
+        // Звёзды
         if (theme.hasStars) {
             ctx.fillStyle = 'white';
             for (const star of this.stars) {
                 const tw = Math.sin(this.frameCount * star.speed + star.twinkle) * 0.5 + 0.5;
                 ctx.globalAlpha = tw;
-                ctx.beginPath();
-                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2); ctx.fill();
             }
             ctx.globalAlpha = 1;
         }
         
-        // 3. СОЛНЦЕ/ЛУНА — БЕЗ масштабирования (в экранных координатах)
+        // Солнце/Луна
         const celX = this.displayWidth - 80;
         const celY = 100;
         const celR = 35 * this.scale;
         
         if (theme.hasSun) {
-            ctx.fillStyle = theme.sunColor;
-            ctx.globalAlpha = 0.3;
+            ctx.fillStyle = theme.sunColor; ctx.globalAlpha = 0.3;
             ctx.beginPath(); ctx.arc(celX, celY, celR * 1.4, 0, Math.PI * 2); ctx.fill();
-            ctx.globalAlpha = 1;
-            ctx.beginPath(); ctx.arc(celX, celY, celR, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(celX, celY, celR, 0, Math.PI * 2); ctx.fill();
         }
         if (theme.hasMoon) {
             ctx.fillStyle = 'rgba(255, 250, 205, 0.15)';
             ctx.beginPath(); ctx.arc(celX, celY, celR * 1.6, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = theme.moonColor;
-            ctx.beginPath(); ctx.arc(celX, celY, celR, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = theme.moonColor; ctx.beginPath(); ctx.arc(celX, celY, celR, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = 'rgba(0,0,0,0.15)';
-            ctx.beginPath();
-            ctx.arc(celX - 8 * this.scale, celY - 5 * this.scale, 5 * this.scale, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(celX + 10 * this.scale, celY + 5 * this.scale, 3 * this.scale, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(celX - 8 * this.scale, celY - 5 * this.scale, 5 * this.scale, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(celX + 10 * this.scale, celY + 5 * this.scale, 3 * this.scale, 0, Math.PI * 2); ctx.fill();
         }
         
-        // 4. Применяем масштаб для игровых объектов
+        // Игровые объекты с масштабированием
         ctx.save();
         ctx.translate(this.offsetX, this.offsetY);
         ctx.scale(this.scale, this.scale);
@@ -1115,49 +1064,34 @@ class FlappyGame {
             for (const p of this.particles) {
                 ctx.fillStyle = p.color;
                 ctx.globalAlpha = p.life / 30;
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill();
             }
-        } catch (err) {
-            console.error('Render error:', err);
-        }
+        } catch (err) { console.error('Render error:', err); }
         
         ctx.globalAlpha = 1;
         ctx.restore();
         
-        // 5. Боковое затемнение на широких экранах (скрывает резкие границы)
+        // Боковое затемнение
         if (this.offsetX > 0) {
             const darkColor = theme.hasStars ? 'rgba(5, 8, 20, 0.7)' : 
                               theme.skyTop === '#FF6B9D' ? 'rgba(80, 20, 40, 0.5)' :
-                              theme.hasTrees ? 'rgba(30, 60, 40, 0.5)' : 
-                              'rgba(100, 160, 200, 0.4)';
-            
-            // Левая полоса
+                              theme.hasTrees ? 'rgba(30, 60, 40, 0.5)' : 'rgba(100, 160, 200, 0.4)';
             const leftGrad = ctx.createLinearGradient(0, 0, this.offsetX, 0);
-            leftGrad.addColorStop(0, darkColor);
-            leftGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = leftGrad;
-            ctx.fillRect(0, 0, this.offsetX, this.canvas.height);
-            
-            // Правая полоса
+            leftGrad.addColorStop(0, darkColor); leftGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = leftGrad; ctx.fillRect(0, 0, this.offsetX, this.canvas.height);
             const rightGrad = ctx.createLinearGradient(this.displayWidth - this.offsetX, 0, this.displayWidth, 0);
-            rightGrad.addColorStop(0, 'rgba(0,0,0,0)');
-            rightGrad.addColorStop(1, darkColor);
-            ctx.fillStyle = rightGrad;
-            ctx.fillRect(this.displayWidth - this.offsetX, 0, this.offsetX, this.canvas.height);
+            rightGrad.addColorStop(0, 'rgba(0,0,0,0)'); rightGrad.addColorStop(1, darkColor);
+            ctx.fillStyle = rightGrad; ctx.fillRect(this.displayWidth - this.offsetX, 0, this.offsetX, this.canvas.height);
         }
     }
     
     drawClouds(theme) {
         const ctx = this.ctx;
         ctx.fillStyle = theme.cloudColor;
-        // Облака покрывают всю видимую область
         const totalW = this.visibleWidth + 200;
         for (const cloud of this.clouds) {
             const x = ((cloud.baseX - this.frameCount * cloud.speed) % totalW + totalW) % totalW + this.visibleLeft - 100;
-            const y = cloud.y;
-            const s = cloud.scale;
+            const y = cloud.y; const s = cloud.scale;
             ctx.beginPath();
             ctx.arc(x, y, 22 * s, 0, Math.PI * 2);
             ctx.arc(x + 22 * s, y - 5 * s, 28 * s, 0, Math.PI * 2);
@@ -1168,14 +1102,10 @@ class FlappyGame {
     
     drawGround(theme) {
         const ctx = this.ctx;
-        // ✅ Земля покрывает ВСЮ видимую область
         const startX = this.visibleLeft - 20;
         const totalW = this.visibleWidth + 40;
-        
         if (theme.hasTrees) {
-            ctx.fillStyle = theme.ground;
-            ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 15, totalW, 15);
-            
+            ctx.fillStyle = theme.ground; ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 15, totalW, 15);
             ctx.fillStyle = '#388E3C';
             const count = Math.ceil(totalW / 10);
             for (let i = 0; i < count; i++) {
@@ -1183,8 +1113,7 @@ class FlappyGame {
                 ctx.fillRect(gx, this.VIRTUAL_HEIGHT - 18, 2, 6);
             }
         } else {
-            ctx.fillStyle = theme.ground;
-            ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 10, totalW, 10);
+            ctx.fillStyle = theme.ground; ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 10, totalW, 10);
         }
     }
     
@@ -1195,16 +1124,12 @@ class FlappyGame {
             this.drawTree(pipe.x, pipe.bottomY, this.VIRTUAL_HEIGHT - pipe.bottomY, false, theme);
             return;
         }
-        
         const g = ctx.createLinearGradient(pipe.x, 0, pipe.x + this.pipeWidth, 0);
-        g.addColorStop(0, theme.pipeMain);
-        g.addColorStop(0.5, theme.pipeLight);
-        g.addColorStop(1, theme.pipeMain);
+        g.addColorStop(0, theme.pipeMain); g.addColorStop(0.5, theme.pipeLight); g.addColorStop(1, theme.pipeMain);
         ctx.fillStyle = g;
         ctx.fillRect(pipe.x, 0, this.pipeWidth, pipe.topHeight);
         ctx.fillRect(pipe.x, pipe.bottomY, this.pipeWidth, this.VIRTUAL_HEIGHT - pipe.bottomY);
-        ctx.strokeStyle = theme.pipeDark;
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = theme.pipeDark; ctx.lineWidth = 2;
         ctx.strokeRect(pipe.x, 0, this.pipeWidth, pipe.topHeight);
         ctx.strokeRect(pipe.x, pipe.bottomY, this.pipeWidth, this.VIRTUAL_HEIGHT - pipe.bottomY);
         ctx.fillStyle = theme.pipeTop;
@@ -1214,65 +1139,48 @@ class FlappyGame {
     
     drawTree(x, y, height, topDown, theme) {
         if (height <= 0) return;
-        const ctx = this.ctx;
-        ctx.save();
+        const ctx = this.ctx; ctx.save();
         try {
             const tg = ctx.createLinearGradient(x, 0, x + this.pipeWidth, 0);
-            tg.addColorStop(0, theme.pipeDark);
-            tg.addColorStop(0.3, theme.pipeMain);
-            tg.addColorStop(0.7, theme.pipeLight);
-            tg.addColorStop(1, theme.pipeDark);
-            ctx.fillStyle = tg;
-            ctx.fillRect(x, y, this.pipeWidth, height);
+            tg.addColorStop(0, theme.pipeDark); tg.addColorStop(0.3, theme.pipeMain);
+            tg.addColorStop(0.7, theme.pipeLight); tg.addColorStop(1, theme.pipeDark);
+            ctx.fillStyle = tg; ctx.fillRect(x, y, this.pipeWidth, height);
             
-            ctx.strokeStyle = theme.pipeDark;
-            ctx.lineWidth = 1;
-            ctx.globalAlpha = 0.4;
+            ctx.strokeStyle = theme.pipeDark; ctx.lineWidth = 1; ctx.globalAlpha = 0.4;
             for (let i = 1; i < 4; i++) {
                 const lx = x + (this.pipeWidth / 4) * i;
-                ctx.beginPath();
-                ctx.moveTo(lx, y); ctx.lineTo(lx, y + height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(lx, y); ctx.lineTo(lx, y + height); ctx.stroke();
             }
             const steps = Math.floor(height / 25);
             for (let i = 0; i < steps; i++) {
                 const iy = y + i * 25;
-                ctx.beginPath();
-                ctx.moveTo(x, iy);
+                ctx.beginPath(); ctx.moveTo(x, iy);
                 ctx.bezierCurveTo(x + this.pipeWidth * 0.3, iy + 3, x + this.pipeWidth * 0.7, iy - 3, x + this.pipeWidth, iy);
                 ctx.stroke();
             }
             ctx.globalAlpha = 1;
-            ctx.strokeStyle = theme.pipeDark;
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x, y, this.pipeWidth, height);
+            ctx.strokeStyle = theme.pipeDark; ctx.lineWidth = 2; ctx.strokeRect(x, y, this.pipeWidth, height);
             
-            const capH = 20;
-            const capX = x - 5;
-            const capW = this.pipeWidth + 10;
+            const capH = 20; const capX = x - 5; const capW = this.pipeWidth + 10;
             const capY = topDown ? y + height - capH : y;
             const lg = ctx.createLinearGradient(capX, capY, capX, capY + capH);
             lg.addColorStop(0, '#2E7D32'); lg.addColorStop(1, '#1B5E20');
-            ctx.fillStyle = lg;
-            ctx.fillRect(capX, capY, capW, capH);
-            ctx.strokeStyle = '#1B5E20'; ctx.lineWidth = 2;
-            ctx.strokeRect(capX, capY, capW, capH);
+            ctx.fillStyle = lg; ctx.fillRect(capX, capY, capW, capH);
+            ctx.strokeStyle = '#1B5E20'; ctx.lineWidth = 2; ctx.strokeRect(capX, capY, capW, capH);
             
             ctx.fillStyle = '#388E3C';
             for (let i = 0; i < 4; i++) {
                 const lx = capX + (capW / 5) * (i + 1);
                 const lby = topDown ? capY + capH : capY;
                 const tipY = topDown ? lby + 10 : lby - 10;
-                ctx.beginPath();
-                ctx.moveTo(lx, lby);
+                ctx.beginPath(); ctx.moveTo(lx, lby);
                 ctx.quadraticCurveTo(lx - 6, (lby + tipY) / 2, lx, tipY);
                 ctx.quadraticCurveTo(lx + 6, (lby + tipY) / 2, lx, lby);
-                ctx.closePath();
-                ctx.fill();
+                ctx.closePath(); ctx.fill();
             }
             
             if (height > 60) {
-                ctx.fillStyle = '#558B2F';
-                ctx.globalAlpha = 0.6;
+                ctx.fillStyle = '#558B2F'; ctx.globalAlpha = 0.6;
                 const ms = (Math.floor(x) % 2 === 0) ? 0 : this.pipeWidth - 8;
                 const msteps = Math.floor(height / 40);
                 for (let i = 0; i < msteps; i++) {
@@ -1283,36 +1191,24 @@ class FlappyGame {
                 ctx.globalAlpha = 1;
             }
         } catch (err) {
-            ctx.globalAlpha = 1;
-            ctx.fillStyle = theme.pipeMain;
-            ctx.fillRect(x, y, this.pipeWidth, height);
+            ctx.globalAlpha = 1; ctx.fillStyle = theme.pipeMain; ctx.fillRect(x, y, this.pipeWidth, height);
         }
-        ctx.restore();
-        ctx.globalAlpha = 1;
+        ctx.restore(); ctx.globalAlpha = 1;
     }
     
     drawCoin(coin) {
-        const ctx = this.ctx;
-        ctx.save();
-        ctx.translate(coin.x, coin.y);
+        const ctx = this.ctx; ctx.save(); ctx.translate(coin.x, coin.y);
         const sc = Math.abs(Math.cos(this.frameCount * 0.1));
         ctx.scale(Math.max(0.1, sc), 1);
-        ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
-        ctx.beginPath(); ctx.arc(0, 0, coin.radius + 5, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#FFD700';
-        ctx.beginPath(); ctx.arc(0, 0, coin.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.3)'; ctx.beginPath(); ctx.arc(0, 0, coin.radius + 5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#FFD700'; ctx.beginPath(); ctx.arc(0, 0, coin.radius, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = '#B8860B'; ctx.lineWidth = 2; ctx.stroke();
-        ctx.fillStyle = '#B8860B';
-        ctx.font = 'bold 14px Arial';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('$', 0, 0);
-        ctx.restore();
+        ctx.fillStyle = '#B8860B'; ctx.font = 'bold 14px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('$', 0, 0); ctx.restore();
     }
     
     drawBird() {
-        const ctx = this.ctx;
-        ctx.save();
-        ctx.translate(this.bird.x, this.bird.y);
+        const ctx = this.ctx; ctx.save(); ctx.translate(this.bird.x, this.bird.y);
         let angle = 0;
         if (this.gameStarted) angle = Math.max(-0.5, Math.min(0.8, this.bird.velocity / 15));
         ctx.rotate(angle);
@@ -1337,130 +1233,72 @@ class FlappyGame {
     
     drawStandardBird(t) {
         const ctx = this.ctx;
-        ctx.fillStyle = '#FFD700';
-        ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#FFD700'; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = '#B8860B'; ctx.lineWidth = 1.5; ctx.stroke();
         const wY = Math.sin(t * 2) * 5;
-        ctx.fillStyle = '#FFA500';
-        ctx.beginPath(); ctx.ellipse(-3, wY, 12, 7, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'white';
-        ctx.beginPath(); ctx.arc(6, -3, 4, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'black';
-        ctx.beginPath(); ctx.arc(7, -3, 2, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#FF6347';
-        ctx.beginPath();
-        ctx.moveTo(13, 0); ctx.lineTo(20, -3); ctx.lineTo(20, 3);
-        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#FFA500'; ctx.beginPath(); ctx.ellipse(-3, wY, 12, 7, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(6, -3, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(7, -3, 2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#FF6347'; ctx.beginPath(); ctx.moveTo(13, 0); ctx.lineTo(20, -3); ctx.lineTo(20, 3); ctx.closePath(); ctx.fill();
     }
     
     drawChicken(t) {
         const ctx = this.ctx;
         const bob = Math.sin(t * 2) * 2;
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath(); ctx.arc(0, bob, 15, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.arc(0, bob, 15, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = '#DDD'; ctx.lineWidth = 1; ctx.stroke();
         const wY = Math.sin(t * 4) * 3;
-        ctx.fillStyle = '#F5F5DC';
-        ctx.beginPath(); ctx.ellipse(-6, bob + wY, 7, 4, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#F5F5DC'; ctx.beginPath(); ctx.ellipse(-6, bob + wY, 7, 4, 0, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.ellipse(-6, bob - wY, 7, 4, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#FF0000';
-        ctx.beginPath(); ctx.arc(-2, -13 + bob, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#FF0000'; ctx.beginPath(); ctx.arc(-2, -13 + bob, 3, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(2, -14 + bob, 3, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(0, -16 + bob, 3, 0, Math.PI * 2); ctx.fill();
         const blink = Math.sin(t * 0.5) > 0.95 ? 0.5 : 2;
-        ctx.fillStyle = 'black';
-        ctx.beginPath(); ctx.arc(6, -3 + bob, blink, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(6, -3 + bob, blink, 0, Math.PI * 2); ctx.fill();
         const bo = Math.sin(t * 3) * 0.5;
-        ctx.fillStyle = '#FFA500';
-        ctx.beginPath();
-        ctx.moveTo(12, bob); ctx.lineTo(19, bob - 2 - bo); ctx.lineTo(19, bob + 2 + bo);
-        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#FFA500'; ctx.beginPath(); ctx.moveTo(12, bob); ctx.lineTo(19, bob - 2 - bo); ctx.lineTo(19, bob + 2 + bo); ctx.closePath(); ctx.fill();
     }
     
     drawParrot(t) {
         const ctx = this.ctx;
         const w = Math.sin(t * 2) * 3;
-        ctx.fillStyle = '#32CD32';
-        ctx.beginPath(); ctx.arc(0, w, 15, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#32CD32'; ctx.beginPath(); ctx.arc(0, w, 15, 0, Math.PI * 2); ctx.fill();
         const sp = Math.sin(t * 4) * 6 + 14;
-        ctx.fillStyle = '#FF1493';
-        ctx.beginPath(); ctx.ellipse(-8, w, sp, 9, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#4169E1';
-        ctx.beginPath(); ctx.arc(8, w - 7, 8, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'white';
-        ctx.beginPath(); ctx.arc(11, w - 9, 3, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'black';
-        ctx.beginPath(); ctx.arc(12, w - 9, 1.5, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#333';
-        ctx.beginPath();
-        ctx.moveTo(14, w - 7);
-        ctx.quadraticCurveTo(22, w - 9, 20, w - 4);
-        ctx.quadraticCurveTo(18, w - 5, 14, w - 5);
-        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#FF1493'; ctx.beginPath(); ctx.ellipse(-8, w, sp, 9, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#4169E1'; ctx.beginPath(); ctx.arc(8, w - 7, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(11, w - 9, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(12, w - 9, 1.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#333'; ctx.beginPath(); ctx.moveTo(14, w - 7); ctx.quadraticCurveTo(22, w - 9, 20, w - 4); ctx.quadraticCurveTo(18, w - 5, 14, w - 5); ctx.closePath(); ctx.fill();
     }
     
     drawDragon(t) {
         const ctx = this.ctx;
         for (let i = 0; i < 6; i++) {
             ctx.fillStyle = `rgba(255, ${120 - i * 20}, 0, ${Math.max(0.1, 0.7 - i * 0.1)})`;
-            ctx.beginPath();
-            ctx.arc(-22 - i * 7, 0, Math.max(1, 7 - i * 0.5), 0, Math.PI * 2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(-22 - i * 7, 0, Math.max(1, 7 - i * 0.5), 0, Math.PI * 2); ctx.fill();
         }
-        ctx.fillStyle = '#8B0000';
-        ctx.beginPath(); ctx.arc(0, 0, 17, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#8B0000'; ctx.beginPath(); ctx.arc(0, 0, 17, 0, Math.PI * 2); ctx.fill();
         const wA = Math.sin(t * 2) * 0.6;
-        ctx.save(); ctx.rotate(wA);
-        ctx.fillStyle = '#DC143C';
-        ctx.beginPath();
-        ctx.moveTo(-8, -5); ctx.lineTo(-28, -18); ctx.lineTo(-22, -5);
-        ctx.closePath(); ctx.fill();
-        ctx.restore();
-        ctx.save(); ctx.rotate(-wA);
-        ctx.fillStyle = '#DC143C';
-        ctx.beginPath();
-        ctx.moveTo(-8, 5); ctx.lineTo(-28, 18); ctx.lineTo(-22, 5);
-        ctx.closePath(); ctx.fill();
-        ctx.restore();
-        ctx.fillStyle = '#2F4F4F';
-        ctx.beginPath();
-        ctx.moveTo(3, -13); ctx.lineTo(6, -22); ctx.lineTo(9, -13);
-        ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#FFFF00';
-        ctx.beginPath(); ctx.arc(8, -4, 4, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'black';
-        ctx.beginPath(); ctx.arc(9, -4, 1.5, 0, Math.PI * 2); ctx.fill();
+        ctx.save(); ctx.rotate(wA); ctx.fillStyle = '#DC143C'; ctx.beginPath(); ctx.moveTo(-8, -5); ctx.lineTo(-28, -18); ctx.lineTo(-22, -5); ctx.closePath(); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.rotate(-wA); ctx.fillStyle = '#DC143C'; ctx.beginPath(); ctx.moveTo(-8, 5); ctx.lineTo(-28, 18); ctx.lineTo(-22, 5); ctx.closePath(); ctx.fill(); ctx.restore();
+        ctx.fillStyle = '#2F4F4F'; ctx.beginPath(); ctx.moveTo(3, -13); ctx.lineTo(6, -22); ctx.lineTo(9, -13); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#FFFF00'; ctx.beginPath(); ctx.arc(8, -4, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(9, -4, 1.5, 0, Math.PI * 2); ctx.fill();
     }
     
     drawPlane(t) {
         const ctx = this.ctx;
         const sh = Math.sin(t * 15) * 0.5;
         ctx.save(); ctx.translate(sh, 0);
-        ctx.fillStyle = '#E0E0E0';
-        ctx.fillRect(-20, -7, 40, 14);
-        ctx.fillStyle = '#FF4444';
-        ctx.fillRect(-20, -2, 5, 4);
-        ctx.fillStyle = '#A0A0A0';
-        ctx.beginPath();
-        ctx.moveTo(-5, -7); ctx.lineTo(-10, -20); ctx.lineTo(5, -20); ctx.lineTo(10, -7);
-        ctx.closePath(); ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(-5, 7); ctx.lineTo(-10, 20); ctx.lineTo(5, 20); ctx.lineTo(10, 7);
-        ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#A0A0A0';
-        ctx.beginPath();
-        ctx.moveTo(-20, -4); ctx.lineTo(-28, -12); ctx.lineTo(-20, 0);
-        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#E0E0E0'; ctx.fillRect(-20, -7, 40, 14);
+        ctx.fillStyle = '#FF4444'; ctx.fillRect(-20, -2, 5, 4);
+        ctx.fillStyle = '#A0A0A0'; ctx.beginPath(); ctx.moveTo(-5, -7); ctx.lineTo(-10, -20); ctx.lineTo(5, -20); ctx.lineTo(10, -7); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(-5, 7); ctx.lineTo(-10, 20); ctx.lineTo(5, 20); ctx.lineTo(10, 7); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#A0A0A0'; ctx.beginPath(); ctx.moveTo(-20, -4); ctx.lineTo(-28, -12); ctx.lineTo(-20, 0); ctx.closePath(); ctx.fill();
         ctx.save(); ctx.translate(22, 0); ctx.rotate(t * 25);
-        ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(-14, 0); ctx.lineTo(14, 0);
-        ctx.moveTo(0, -14); ctx.lineTo(0, 14);
-        ctx.stroke();
+        ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(14, 0); ctx.moveTo(0, -14); ctx.lineTo(0, 14); ctx.stroke();
         ctx.restore();
-        ctx.fillStyle = '#87CEEB';
-        ctx.fillRect(-2, -4, 5, 5);
-        ctx.fillRect(6, -4, 5, 5);
+        ctx.fillStyle = '#87CEEB'; ctx.fillRect(-2, -4, 5, 5); ctx.fillRect(6, -4, 5, 5);
         ctx.restore();
     }
     
@@ -1470,31 +1308,16 @@ class FlappyGame {
             const a = Math.max(0, 0.8 - i * 0.08);
             const r = Math.max(1, 8 - i * 0.5);
             const g = ctx.createRadialGradient(-22 - i * 4, 0, 0, -22 - i * 4, 0, r);
-            g.addColorStop(0, `rgba(255, 255, 200, ${a})`);
-            g.addColorStop(0.5, `rgba(255, 150, 0, ${a * 0.7})`);
-            g.addColorStop(1, 'rgba(255, 50, 0, 0)');
-            ctx.fillStyle = g;
-            ctx.beginPath(); ctx.arc(-22 - i * 4, 0, r, 0, Math.PI * 2); ctx.fill();
+            g.addColorStop(0, `rgba(255, 255, 200, ${a})`); g.addColorStop(0.5, `rgba(255, 150, 0, ${a * 0.7})`); g.addColorStop(1, 'rgba(255, 50, 0, 0)');
+            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(-22 - i * 4, 0, r, 0, Math.PI * 2); ctx.fill();
         }
         const v = Math.sin(t * 20) * 1;
         ctx.save(); ctx.translate(v, 0);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.moveTo(20, 0); ctx.lineTo(-15, -12); ctx.lineTo(-15, 12);
-        ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#FF0000';
-        ctx.beginPath();
-        ctx.moveTo(20, 0); ctx.lineTo(25, -4); ctx.lineTo(25, 4);
-        ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#0000AA';
-        ctx.beginPath();
-        ctx.moveTo(-15, -12); ctx.lineTo(-22, -18); ctx.lineTo(-18, -10);
-        ctx.closePath(); ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(-15, 12); ctx.lineTo(-22, 18); ctx.lineTo(-18, 10);
-        ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#87CEEB';
-        ctx.beginPath(); ctx.arc(5, 0, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.moveTo(20, 0); ctx.lineTo(-15, -12); ctx.lineTo(-15, 12); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#FF0000'; ctx.beginPath(); ctx.moveTo(20, 0); ctx.lineTo(25, -4); ctx.lineTo(25, 4); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#0000AA'; ctx.beginPath(); ctx.moveTo(-15, -12); ctx.lineTo(-22, -18); ctx.lineTo(-18, -10); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(-15, 12); ctx.lineTo(-22, 18); ctx.lineTo(-18, 10); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#87CEEB'; ctx.beginPath(); ctx.arc(5, 0, 5, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = '#999'; ctx.lineWidth = 1.5; ctx.stroke();
         ctx.restore();
     }
@@ -1503,20 +1326,15 @@ class FlappyGame {
         const ctx = this.ctx;
         const a = 0.55 + Math.sin(t * 2.5) * 0.25;
         const w = Math.sin(t * 1.5) * 5;
-        ctx.globalAlpha = a;
-        ctx.fillStyle = '#F8F8FF';
-        ctx.beginPath();
-        ctx.arc(0, w, 15, Math.PI, 0, false);
-        ctx.lineTo(15, w + 12);
+        ctx.globalAlpha = a; ctx.fillStyle = '#F8F8FF';
+        ctx.beginPath(); ctx.arc(0, w, 15, Math.PI, 0, false); ctx.lineTo(15, w + 12);
         for (let i = 0; i < 5; i++) {
             const x = 15 - i * 6;
             ctx.quadraticCurveTo(x - 1.5, w + 16, x - 3, w + 12);
             ctx.quadraticCurveTo(x - 4.5, w + 16, x - 6, w + 12);
         }
-        ctx.closePath(); ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = '#000';
-        ctx.beginPath(); ctx.arc(-5, w - 2, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+        ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(-5, w - 2, 3, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(5, w - 2, 3, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(0, w + 4, 3, 0, Math.PI * 2); ctx.fill();
     }
@@ -1526,42 +1344,27 @@ class FlappyGame {
         for (let i = 0; i < 12; i++) {
             const a = t * 2 + (i * Math.PI / 6);
             const r = 22 + Math.sin(t * 4 + i) * 4;
-            const x = Math.cos(a) * r;
-            const y = Math.sin(a) * r;
+            const x = Math.cos(a) * r; const y = Math.sin(a) * r;
             const sa = 0.5 + Math.sin(t * 5 + i * 2) * 0.4;
-            ctx.fillStyle = `rgba(255, 223, 0, ${sa})`;
-            ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = `rgba(255, 223, 0, ${sa})`; ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
         }
         for (let i = 0; i < 6; i++) {
-            const sx = Math.cos(t * 7 + i) * 18;
-            const sy = Math.sin(t * 7 + i * 1.5) * 18;
+            const sx = Math.cos(t * 7 + i) * 18; const sy = Math.sin(t * 7 + i * 1.5) * 18;
             const sa = (Math.sin(t * 10 + i * 3) + 1) / 2;
-            ctx.strokeStyle = `rgba(255, 255, 255, ${sa})`;
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${sa})`; ctx.lineWidth = 1.5;
             ctx.beginPath(); ctx.moveTo(sx - 3, sy); ctx.lineTo(sx + 3, sy); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(sx, sy - 3); ctx.lineTo(sx, sy + 3); ctx.stroke();
         }
         const bg = ctx.createRadialGradient(-4, -4, 0, 0, 0, 16);
-        bg.addColorStop(0, '#FFF5B0');
-        bg.addColorStop(0.5, '#FFD700');
-        bg.addColorStop(1, '#DAA520');
-        ctx.fillStyle = bg;
-        ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.fill();
+        bg.addColorStop(0, '#FFF5B0'); bg.addColorStop(0.5, '#FFD700'); bg.addColorStop(1, '#DAA520');
+        ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = '#B8860B'; ctx.lineWidth = 1.5; ctx.stroke();
         const wY = Math.sin(t * 2) * 5;
-        ctx.fillStyle = '#FFD700';
-        ctx.beginPath(); ctx.ellipse(-3, wY, 11, 7, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#FFD700';
-        ctx.beginPath();
-        ctx.moveTo(-7, -13); ctx.lineTo(-5, -20); ctx.lineTo(-3, -15);
-        ctx.lineTo(-1, -22); ctx.lineTo(1, -15); ctx.lineTo(3, -22);
-        ctx.lineTo(5, -15); ctx.lineTo(7, -20); ctx.lineTo(8, -12);
-        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#FFD700'; ctx.beginPath(); ctx.ellipse(-3, wY, 11, 7, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#FFD700'; ctx.beginPath(); ctx.moveTo(-7, -13); ctx.lineTo(-5, -20); ctx.lineTo(-3, -15); ctx.lineTo(-1, -22); ctx.lineTo(1, -15); ctx.lineTo(3, -22); ctx.lineTo(5, -15); ctx.lineTo(7, -20); ctx.lineTo(8, -12); ctx.closePath(); ctx.fill();
         ctx.strokeStyle = '#B8860B'; ctx.stroke();
-        ctx.fillStyle = 'white';
-        ctx.beginPath(); ctx.arc(6, -3, 4, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'black';
-        ctx.beginPath(); ctx.arc(7, -3, 2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(6, -3, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(7, -3, 2, 0, Math.PI * 2); ctx.fill();
     }
 }
 
