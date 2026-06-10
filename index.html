@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Flappy Bird</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Главный экран -->
+    <div id="menuScreen" class="screen active">
+        <h1 class="game-title">Flappy Bird</h1>
+        
+        <div id="playerInfo" class="player-info">
+            <img id="playerAvatar" class="player-avatar" src="" alt="" style="display:none;">
+            <span id="playerName" class="player-name">Игрок</span>
+        </div>
+        
+        <div class="coin-display">
+            <span class="coin-icon">🪙</span>
+            <span id="coinCount">0</span>
+        </div>
+        
+        <canvas id="menuCanvas" width="320" height="220"></canvas>
+        
+        <div class="menu-buttons">
+            <button id="playBtn" class="menu-btn primary">Играть</button>
+            <button id="skinsBtn" class="menu-btn secondary">Скины</button>
+            <button id="settingsBtn" class="menu-btn accent">⚙ Настройки</button>
+            <button id="recordsBtn" class="menu-btn accent">Рекорды</button>
+        </div>
+    </div>
+
+    <!-- Экран скинов -->
+    <div id="skinsScreen" class="screen">
+        <div class="screen-header">
+            <button class="back-btn" data-target="menuScreen">← Назад</button>
+            <div class="coin-display small">
+                <span class="coin-icon">🪙</span>
+                <span id="coinCountSkins">0</span>
+            </div>
+        </div>
+        <h2 class="screen-title">Выберите скин</h2>
+        <div id="skinsGrid"></div>
+    </div>
+
+    <!-- Экран игры (полноэкранный) -->
+    <div id="gameScreen" class="screen">
+        <button class="back-btn" id="gameBackBtn" style="position: absolute; top: 15px; left: 15px; z-index: 100;">← Меню</button>
+        
+        <div style="position: absolute; top: 15px; right: 15px; z-index: 100; display: flex; align-items: center; gap: 15px;">
+            <div id="score">0</div>
+            <div class="coin-display small">
+                <span class="coin-icon">🪙</span>
+                <span id="gameCoinCount">0</span>
+            </div>
+        </div>
+        
+        <canvas id="gameCanvas"></canvas>
+        <div id="tapHint">Нажмите для старта</div>
+    </div>
+
+    <!-- Экран смерти -->
+    <div id="deathScreen" class="screen">
+        <h2 class="screen-title">Игра окончена</h2>
+        <div id="finalStats">
+            <div class="stat-row">
+                <span>Счёт:</span>
+                <strong id="finalScore">0</strong>
+            </div>
+            <div class="stat-row">
+                <span>Заработано монет:</span>
+                <strong id="earnedCoins">0</strong>
+            </div>
+            <div class="stat-row highlight">
+                <span>Лучший результат:</span>
+                <strong id="bestScore">0</strong>
+            </div>
+        </div>
+        <div class="menu-buttons">
+            <button id="restartBtn" class="menu-btn primary">Играть снова</button>
+            <button id="menuBtn" class="menu-btn secondary">В меню</button>
+        </div>
+    </div>
+
+    <!-- Экран рекордов -->
+    <div id="recordsScreen" class="screen">
+        <div class="screen-header">
+            <button class="back-btn" data-target="menuScreen">← Назад</button>
+        </div>
+        <h2 class="screen-title">Таблица рекордов</h2>
+        <div id="leaderboard">
+            <ul id="leaderboardList"></ul>
+        </div>
+        <button class="menu-btn secondary" style="margin-top: 20px;" data-target="menuScreen">В меню</button>
+    </div>
+
+    <!-- Экран настроек -->
+    <div id="settingsScreen" class="screen">
+        <div class="screen-header">
+            <button class="back-btn" data-target="menuScreen">← Назад</button>
+        </div>
+        <h2 class="screen-title">⚙ Настройки</h2>
+        
+        <div class="settings-container">
+            <!-- Темы -->
+            <div class="settings-section">
+                <h3 class="section-title">🎨 Тема оформления</h3>
+                <div id="themesGrid" class="themes-grid"></div>
+            </div>
+            
+            <!-- Звук -->
+            <div class="settings-section">
+                <h3 class="section-title">🔊 Звук</h3>
+                
+                <div class="sound-control">
+                    <div class="sound-label">
+                        <span>🎵 Музыка</span>
+                        <span class="sound-value" id="musicValue">70%</span>
+                    </div>
+                    <div class="slider-row">
+                        <button class="mute-btn" id="musicToggle" title="Вкл/Выкл">🎵</button>
+                        <input type="range" id="musicSlider" class="styled-slider" min="0" max="100" value="70">
+                    </div>
+                </div>
+                
+                <div class="sound-control">
+                    <div class="sound-label">
+                        <span>🔔 Звуковые эффекты</span>
+                        <span class="sound-value" id="sfxValue">80%</span>
+                    </div>
+                    <div class="slider-row">
+                        <button class="mute-btn" id="sfxToggle" title="Вкл/Выкл">🔔</button>
+                        <input type="range" id="sfxSlider" class="styled-slider" min="0" max="100" value="80">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://yandex.ru/games/sdk/v2" async></script>
+    <script src="lang.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
