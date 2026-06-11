@@ -1259,9 +1259,9 @@ class FlappyGame {
     
     if (DeviceInfo.isMobile) {
       // 📱 МОБИЛЬНЫЙ: min = -30 гарантирует, что верхняя труба уходит за край экрана (нет "потолка")
-      min = -30;  
+      min = -50;  
       // Оставляем минимум 80px над землёй для нижней трубы
-      max = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - 80;  
+      max = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - 50;  
     } else {
       // 💻 ПК: обе трубы всегда видны
       min = 50;
