@@ -1,3 +1,6 @@
+// ==========================================
+// ТЕМА ОФОРМЛЕНИЯ
+// ==========================================
 const THEMES = {
     day: { name: T.themeNames.day, skyTop: '#87CEEB', skyBottom: '#B0E0E6', cloudColor: 'rgba(255,255,255,0.8)', pipeMain: '#4CAF50', pipeLight: '#81C784', pipeDark: '#2E7D32', pipeTop: '#388E3C', ground: '#8BC34A', hasSun: true, hasMoon: false, hasStars: false, hasTrees: false, sunColor: '#FFEB3B', moonColor: '#F5F5DC' },
     night: { name: T.themeNames.night, skyTop: '#0B1026', skyBottom: '#1A237E', cloudColor: 'rgba(200,200,255,0.25)', pipeMain: '#37474F', pipeLight: '#546E7A', pipeDark: '#1C262B', pipeTop: '#263238', ground: '#1B5E20', hasSun: false, hasMoon: true, hasStars: true, hasTrees: false, sunColor: '#FFEB3B', moonColor: '#FFFACD' },
@@ -5,8 +8,19 @@ const THEMES = {
     forest: { name: T.themeNames.forest, skyTop: '#A8D5BA', skyBottom: '#D4E8C2', cloudColor: 'rgba(255,255,255,0.5)', pipeMain: '#6D4C41', pipeLight: '#8D6E63', pipeDark: '#4E342E', pipeTop: '#3E2723', ground: '#558B2F', hasSun: false, hasMoon: false, hasStars: false, hasTrees: true, sunColor: '#FFEB3B', moonColor: '#FFFACD' }
 };
 
-const gameState = { name: T.guest, avatar: null, uniqueId: 'local', coins: 0, currentSkin: 'standard', ownedSkins: ['standard'], bestScore: 0, totalGames: 0, theme: 'day' };
-const settings = { musicVolume: 0.7, sfxVolume: 0.8, musicMuted: false, sfxMuted: false };
+// ==========================================
+// СОСТОЯНИЕ
+// ==========================================
+const gameState = {
+    name: T.guest, avatar: null, uniqueId: 'local',
+    coins: 0, currentSkin: 'standard', ownedSkins: ['standard'],
+    bestScore: 0, totalGames: 0, theme: 'day'
+};
+
+const settings = {
+    musicVolume: 0.7, sfxVolume: 0.8,
+    musicMuted: false, sfxMuted: false
+};
 
 (function loadLocalData() {
     const saved = localStorage.getItem('flappyPlayer');
@@ -15,8 +29,13 @@ const settings = { musicVolume: 0.7, sfxVolume: 0.8, musicMuted: false, sfxMuted
     if (savedSettings) { try { Object.assign(settings, JSON.parse(savedSettings)); } catch (e) {} }
 })();
 
+// ==========================================
+// ЗВУК
+// ==========================================
 const SoundManager = {
-    audioCtx: null, musicGain: null, sfxGain: null, musicPlaying: false, musicTimeout: null,
+    audioCtx: null, musicGain: null, sfxGain: null,
+    musicPlaying: false, musicTimeout: null,
+    
     init() {
         try {
             this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -25,12 +44,15 @@ const SoundManager = {
             this.updateVolumes();
         } catch (e) {}
     },
+    
     resume() { if (this.audioCtx && this.audioCtx.state === 'suspended') this.audioCtx.resume(); },
+    
     updateVolumes() {
         if (!this.audioCtx) return;
         this.musicGain.gain.value = settings.musicMuted ? 0 : settings.musicVolume * 0.3;
         this.sfxGain.gain.value = settings.sfxMuted ? 0 : settings.sfxVolume;
     },
+    
     playFlap() {
         if (!this.audioCtx || settings.sfxMuted) return; this.resume();
         try {
@@ -43,6 +65,7 @@ const SoundManager = {
             osc.start(now); osc.stop(now + 0.1);
         } catch (e) {}
     },
+    
     playCoin() {
         if (!this.audioCtx || settings.sfxMuted) return; this.resume();
         try {
@@ -58,6 +81,7 @@ const SoundManager = {
             });
         } catch (e) {}
     },
+    
     playCrash() {
         if (!this.audioCtx || settings.sfxMuted) return; this.resume();
         try {
@@ -79,6 +103,23 @@ const SoundManager = {
             noise.start(now); osc.start(now); osc.stop(now + 0.3);
         } catch (e) {}
     },
+    
+    playUIClick() {
+        if (!this.audioCtx || settings.sfxMuted) return; this.resume();
+        try {
+            const now = this.audioCtx.currentTime;
+            const osc = this.audioCtx.createOscillator();
+            const gain = this.audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, now);
+            osc.frequency.exponentialRampToValueAtTime(800, now + 0.05);
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+            osc.connect(gain); gain.connect(this.sfxGain);
+            osc.start(now); osc.stop(now + 0.08);
+        } catch (e) {}
+    },
+    
     startMusic() {
         if (!this.audioCtx || settings.musicMuted || this.musicPlaying) return;
         this.resume(); this.musicPlaying = true;
@@ -118,12 +159,16 @@ const SoundManager = {
         };
         playNextNote();
     },
+    
     stopMusic() {
         this.musicPlaying = false;
         if (this.musicTimeout) { clearTimeout(this.musicTimeout); this.musicTimeout = null; }
     }
 };
 
+// ==========================================
+// YANDEX SDK
+// ==========================================
 let ysdk = null, yandexPlayer = null, sdkReady = false;
 
 const YandexAPI = {
@@ -134,6 +179,7 @@ const YandexAPI = {
             sdkReady = true; await this.syncPlayerData(); return true;
         } catch (err) { sdkReady = false; return false; }
     },
+    
     async _tryInit() {
         let a = 0;
         while (typeof YaGames === 'undefined' && a < 30) { await new Promise(r => setTimeout(r, 100)); a++; }
@@ -141,6 +187,7 @@ const YandexAPI = {
         ysdk = await YaGames.init();
         try { yandexPlayer = await ysdk.getPlayer({ scopes: false }); } catch (e) {}
     },
+    
     async syncPlayerData() {
         if (!sdkReady || !yandexPlayer) return;
         try {
@@ -160,6 +207,7 @@ const YandexAPI = {
             if (nm) nm.textContent = gameState.name;
         } catch (e) {}
     },
+    
     async savePlayerData(data) {
         try { localStorage.setItem('flappyPlayer', JSON.stringify(data)); } catch (e) {}
         if (!sdkReady || !yandexPlayer) return data;
@@ -172,11 +220,13 @@ const YandexAPI = {
         } catch (e) {}
         return data;
     },
+    
     async submitScore(score) {
         if (!sdkReady || !ysdk) return false;
         try { const lb = await ysdk.getLeaderboards(); await lb.setLeaderboardScore('flappycores', score); return true; }
         catch (e) { return false; }
     },
+    
     async getLeaderboard() {
         if (!sdkReady || !ysdk) return this.getStaticLeaderboard();
         try {
@@ -185,6 +235,7 @@ const YandexAPI = {
             return r.entries.map(e => ({ rank: e.rank, name: e.player.publicName || T.guest, score: e.score, avatar: e.player.getPhoto?.('small') || '', uniqueId: e.player.uniqueID }));
         } catch (e) { return this.getStaticLeaderboard(); }
     },
+    
     getStaticLeaderboard() {
         return [
             { rank: 1, name: "Александр", score: 87, uniqueId: 'a' }, { rank: 2, name: "Мария", score: 72, uniqueId: 'b' },
@@ -196,6 +247,9 @@ const YandexAPI = {
     }
 };
 
+// ==========================================
+// СКИНЫ
+// ==========================================
 const SKINS = {
     standard: { price: 0, name: T.skinNames.standard }, chicken: { price: 10, name: T.skinNames.chicken },
     parrot: { price: 20, name: T.skinNames.parrot }, dragon: { price: 30, name: T.skinNames.dragon },
@@ -203,6 +257,56 @@ const SKINS = {
     ghost: { price: 100, name: T.skinNames.ghost }, gold: { price: 150, name: T.skinNames.gold }
 };
 
+// ==========================================
+// ПРОСТАЯ СИСТЕМА ПЕРЕХОДОВ (ИСПРАВЛЕНО)
+// ==========================================
+const ScreenManager = {
+    currentScreen: 'menuScreen',
+    isTransitioning: false,
+    
+    // Переход между экранами: fade out → fade in (без наложений)
+    goTo(targetId, game = null) {
+        if (this.isTransitioning) return;
+        if (targetId === this.currentScreen) return;
+        
+        const fromEl = document.getElementById(this.currentScreen);
+        const toEl = document.getElementById(targetId);
+        
+        if (!fromEl || !toEl) return;
+        
+        this.isTransitioning = true;
+        SoundManager.playUIClick();
+        
+        // === ШАГ 1: Плавный fade out текущего экрана ===
+        fromEl.classList.remove('active');
+        
+        // === ШАГ 2: Ждём полного исчезновения старого экрана ===
+        setTimeout(() => {
+            // === ШАГ 3: Плавный fade in нового экрана ===
+            toEl.classList.add('active');
+            
+            // === ШАГ 4: Ждём полного появления и разблокируем переходы ===
+            setTimeout(() => {
+                this.currentScreen = targetId;
+                this.isTransitioning = false;
+                
+                // Колбэки после перехода
+                if (targetId === 'skinsScreen' && game) {
+                    game.renderSkinsGrid();
+                } else if (targetId === 'settingsScreen' && game) {
+                    game.renderSettingsScreen();
+                } else if (targetId === 'menuScreen' && game) {
+                    game.updateUIFromState();
+                    game.startMenuPreview();
+                }
+            }, 280);
+        }, 280);
+    }
+};
+
+// ==========================================
+// ИГРА
+// ==========================================
 class FlappyGame {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
@@ -216,17 +320,14 @@ class FlappyGame {
         this.visibleLeft = 0; this.visibleRight = this.VIRTUAL_WIDTH; this.visibleWidth = this.VIRTUAL_WIDTH;
         this.displayWidth = 400; this.displayHeight = 600;
         
-        // ⚡ БАЗОВЫЕ КОНСТАНТЫ (калиброваны под 60 FPS, используются как "за виртуальный кадр")
-        // Подстроены под оригинальный Flappy Bird: быстрая, но играбельная физика
-        this.gravity = 0.35;           // было 0.15 — теперь как в оригинале
-        this.jumpStrength = -6.5;      // было -5 — сильный, но контролируемый прыжок
-        this.terminalVelocity = 11;    // макс. скорость падения
-        this.pipeGap = 165;            // было 180 — чуть сложнее
+        this.gravity = 0.35;
+        this.jumpStrength = -6.5;
+        this.terminalVelocity = 11;
+        this.pipeGap = 165;
         this.pipeWidth = 60;
-        this.pipeSpeed = 2.8;          // было 2 — быстрее
-        this.pipeInterval = 95;        // было 110 — чаще
+        this.pipeSpeed = 2.8;
+        this.pipeInterval = 95;
         
-        // ⚡ FIXED TIMESTEP (60 обновлений логики в секунду, независимо от FPS монитора)
         this.FIXED_DT = 1 / 60;
         this.accumulator = 0;
         this.lastTime = null;
@@ -248,8 +349,27 @@ class FlappyGame {
         
         SoundManager.init(); SoundManager.updateVolumes();
         YandexAPI.init().catch(() => {});
+        
+        this.pausedForRotation = false;
+        this.checkMobileOrientation();
+        
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => this.checkMobileOrientation(), 100);
+        });
+        
+        if (window.matchMedia) {
+            const portraitQuery = window.matchMedia('(orientation: portrait)');
+            const handleOrientationChange = () => this.checkMobileOrientation();
+            if (portraitQuery.addEventListener) {
+                portraitQuery.addEventListener('change', handleOrientationChange);
+            } else if (portraitQuery.addListener) {
+                portraitQuery.addListener(handleOrientationChange);
+            }
+        }
+        
+        this.tryLockOrientation();
     }
-    
+
     generateClouds() {
         this.clouds = [];
         for (let i = 0; i < 8; i++) {
@@ -261,7 +381,7 @@ class FlappyGame {
             });
         }
     }
-    
+
     generateStars() {
         this.stars = [];
         for (let i = 0; i < 150; i++) {
@@ -274,7 +394,7 @@ class FlappyGame {
             });
         }
     }
-    
+
     updateUIFromState() {
         const cc = document.getElementById('coinCount'); if (cc) cc.textContent = gameState.coins;
         const sc = document.getElementById('coinCountSkins'); if (sc) sc.textContent = gameState.coins;
@@ -283,24 +403,34 @@ class FlappyGame {
         if (nm) nm.textContent = gameState.name;
         const bs = document.getElementById('bestScore'); if (bs) bs.textContent = gameState.bestScore;
     }
-    
+
     bindEvents() {
-        const ids = {
-            playBtn: () => this.startGame(),
-            skinsBtn: () => this.showScreen('skinsScreen'),
-            settingsBtn: () => { this.showScreen('settingsScreen'); this.renderSettingsScreen(); },
-            recordsBtn: () => this.showRecords(),
-            restartBtn: () => this.startGame(),
-            menuBtn: () => this.goToMenu(),
-            gameBackBtn: () => this.confirmExit()
-        };
-        for (const [id, fn] of Object.entries(ids)) {
-            const el = document.getElementById(id); if (el) el.addEventListener('click', fn);
-        }
+        const playBtn = document.getElementById('playBtn');
+        const skinsBtn = document.getElementById('skinsBtn');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const recordsBtn = document.getElementById('recordsBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const menuBtn = document.getElementById('menuBtn');
+        const gameBackBtn = document.getElementById('gameBackBtn');
+        
+        if (playBtn) playBtn.addEventListener('click', () => this.startGame());
+        if (skinsBtn) skinsBtn.addEventListener('click', () => ScreenManager.goTo('skinsScreen', this));
+        if (settingsBtn) settingsBtn.addEventListener('click', () => ScreenManager.goTo('settingsScreen', this));
+        if (recordsBtn) recordsBtn.addEventListener('click', () => {
+            ScreenManager.goTo('recordsScreen', this);
+            setTimeout(() => this.loadLeaderboard(), 300);
+        });
+        if (restartBtn) restartBtn.addEventListener('click', () => this.restartGame());
+        if (menuBtn) menuBtn.addEventListener('click', () => this.goToMenu());
+        if (gameBackBtn) gameBackBtn.addEventListener('click', () => this.confirmExit());
         
         document.querySelectorAll('[data-target]').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const t = e.currentTarget.dataset.target; if (t) this.showScreen(t);
+                const target = e.currentTarget.dataset.target;
+                if (target) {
+                    if (this.gameRunning) this.stopGame();
+                    ScreenManager.goTo(target, this);
+                }
             });
         });
         
@@ -356,19 +486,19 @@ class FlappyGame {
         }
         
         window.addEventListener('resize', () => this.handleResize());
-        window.addEventListener('orientationchange', () => setTimeout(() => this.handleResize(), 100));
     }
-    
+
     updateSliderProgress(slider) { slider.style.setProperty('--progress', slider.value + '%'); }
     updateMuteButton(btn, muted) { if (muted) btn.classList.add('muted'); else btn.classList.remove('muted'); }
     saveSettings() { try { localStorage.setItem('flappySettings', JSON.stringify(settings)); } catch (e) {} }
-    
+
     handleResize() {
         if (!this.canvas) return;
         const gs = document.getElementById('gameScreen');
         if (gs && gs.classList.contains('active')) this.resizeCanvas();
+        this.checkMobileOrientation();
     }
-    
+
     resizeCanvas() {
         const dpr = window.devicePixelRatio || 1;
         this.displayWidth = window.innerWidth;
@@ -389,7 +519,57 @@ class FlappyGame {
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.generateStars();
     }
-    
+
+    checkMobileOrientation() {
+        const overlay = document.getElementById('rotateOverlay');
+        if (!overlay) return;
+        
+        const isMobile = (
+            ('ontouchstart' in window) ||
+            (navigator.maxTouchPoints > 0) ||
+            (window.innerWidth <= 1024)
+        );
+        
+        if (isMobile) {
+            overlay.classList.add('mobile-device');
+            document.body.classList.add('is-mobile');
+            const isPortrait = window.innerHeight > window.innerWidth;
+            
+            if (isPortrait) {
+                document.body.classList.add('rotate-locked');
+                if (this.gameRunning) this.pauseForRotation();
+            } else {
+                document.body.classList.remove('rotate-locked');
+                if (this.pausedForRotation) this.resumeAfterRotation();
+            }
+        } else {
+            overlay.classList.remove('mobile-device');
+            document.body.classList.remove('is-mobile', 'rotate-locked');
+        }
+    }
+
+    tryLockOrientation() {
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(() => {});
+        }
+    }
+
+    pauseForRotation() {
+        this.pausedForRotation = true;
+        this.gameRunning = false;
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
+        SoundManager.stopMusic();
+    }
+
+    resumeAfterRotation() {
+        if (this.pausedForRotation) {
+            this.pausedForRotation = false;
+        }
+    }
+
     tap() {
         if (!this.gameRunning) return;
         SoundManager.resume();
@@ -402,36 +582,31 @@ class FlappyGame {
         this.bird.velocity = this.jumpStrength;
         SoundManager.playFlap();
     }
-    
-    showScreen(screenId) {
-        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        const t = document.getElementById(screenId); if (t) t.classList.add('active');
-        if (screenId !== 'gameScreen' && this.gameRunning) this.stopGame();
-        if (screenId !== 'menuScreen' && this.menuAnimId) { cancelAnimationFrame(this.menuAnimId); this.menuAnimId = null; }
-        if (screenId !== 'skinsScreen' && this.skinPreviewAnimId) { cancelAnimationFrame(this.skinPreviewAnimId); this.skinPreviewAnimId = null; }
-        if (screenId !== 'settingsScreen') {
-            this.themePreviewAnimIds.forEach(id => cancelAnimationFrame(id));
-            this.themePreviewAnimIds.clear();
-        }
-        if (screenId === 'menuScreen') { this.updateUIFromState(); this.startMenuPreview(); }
-        if (screenId === 'skinsScreen') this.renderSkinsGrid();
-        if (screenId === 'settingsScreen') this.renderSettingsScreen();
+
+    async goToMenu() {
+        await YandexAPI.savePlayerData(gameState);
+        SoundManager.stopMusic();
+        this.stopGame();
+        ScreenManager.goTo('menuScreen', this);
     }
-    
-    async goToMenu() { await YandexAPI.savePlayerData(gameState); SoundManager.stopMusic(); this.showScreen('menuScreen'); }
+
     confirmExit() {
-        if (this.gameStarted && this.score > 0) { if (confirm(T.exitConfirm)) this.goToMenu(); }
-        else this.goToMenu();
+        if (this.gameStarted && this.score > 0) {
+            if (confirm(T.exitConfirm)) this.goToMenu();
+        } else this.goToMenu();
     }
+
     stopGame() {
-        this.gameRunning = false; SoundManager.stopMusic();
+        this.gameRunning = false;
+        SoundManager.stopMusic();
         if (this.animationId) { cancelAnimationFrame(this.animationId); this.animationId = null; }
     }
+
     updateAllCoinDisplays() {
         const c = document.getElementById('coinCount'); if (c) c.textContent = gameState.coins;
         const s = document.getElementById('coinCountSkins'); if (s) s.textContent = gameState.coins;
     }
-    
+
     renderSettingsScreen() {
         const ms = document.getElementById('musicSlider'); const ss = document.getElementById('sfxSlider');
         const mt = document.getElementById('musicToggle'); const st = document.getElementById('sfxToggle');
@@ -456,7 +631,7 @@ class FlappyGame {
             this.startThemePreview(cvs, k);
         });
     }
-    
+
     startThemePreview(canvas, themeKey) {
         const ctx = canvas.getContext('2d'); const theme = THEMES[themeKey]; let frame = 0;
         const render = () => {
@@ -501,14 +676,14 @@ class FlappyGame {
         };
         requestAnimationFrame(render);
     }
-    
+
     async selectTheme(k) {
         if (!THEMES[k]) return;
         gameState.theme = k;
         await YandexAPI.savePlayerData(gameState);
         this.renderSettingsScreen();
     }
-    
+
     startMenuPreview() {
         if (!this.menuCanvas || !this.menuCtx) return;
         if (this.menuAnimId) { cancelAnimationFrame(this.menuAnimId); this.menuAnimId = null; }
@@ -547,7 +722,7 @@ class FlappyGame {
         };
         requestAnimationFrame(render);
     }
-    
+
     renderSkinsGrid() {
         const grid = document.getElementById('skinsGrid'); if (!grid) return;
         if (this.skinPreviewAnimId) { cancelAnimationFrame(this.skinPreviewAnimId); this.skinPreviewAnimId = null; }
@@ -576,7 +751,7 @@ class FlappyGame {
         });
         this.startAllSkinPreviews(canvases);
     }
-    
+
     startAllSkinPreviews(canvases) {
         const ctxs = canvases.map(({ canvas, skinKey }) => ({ ctx: canvas.getContext('2d'), canvas, skinKey }));
         let frame = 0;
@@ -599,7 +774,7 @@ class FlappyGame {
         };
         requestAnimationFrame(render);
     }
-    
+
     async buySkin(k) {
         const p = SKINS[k].price; if (gameState.coins < p) return;
         gameState.coins -= p;
@@ -608,26 +783,50 @@ class FlappyGame {
         await YandexAPI.savePlayerData(gameState);
         this.updateAllCoinDisplays(); this.renderSkinsGrid();
     }
+
     async selectSkin(k) {
         gameState.currentSkin = k;
         await YandexAPI.savePlayerData(gameState);
         this.renderSkinsGrid();
     }
-    
+
+    // ==========================================
+    // ЗАПУСК ИГРЫ (ИСПРАВЛЕНО: таймаут 600мс)
+    // ==========================================
     startGame() {
-        this.showScreen('gameScreen');
-        setTimeout(() => this.resizeCanvas(), 50);
-        this.resetGame();
-        this.gameRunning = true;
-        this.gameStarted = false;
-        const h = document.getElementById('tapHint'); if (h) h.classList.remove('hidden');
-        const b = document.getElementById('gameBackBtn'); if (b) b.classList.remove('game-hidden');
-        SoundManager.resume();
-        this.lastTime = null;
-        this.accumulator = 0;
-        this.gameLoop();
+        ScreenManager.goTo('gameScreen', this);
+        
+        setTimeout(() => {
+            this.resizeCanvas();
+            this.resetGame();
+            this.gameRunning = true;
+            this.gameStarted = false;
+            const h = document.getElementById('tapHint'); if (h) h.classList.remove('hidden');
+            const b = document.getElementById('gameBackBtn'); if (b) b.classList.remove('game-hidden');
+            SoundManager.resume();
+            this.lastTime = null;
+            this.accumulator = 0;
+            this.gameLoop();
+        }, 600); // ⬅️ Ждём полного завершения перехода (280 + 280 = 560ms)
     }
-    
+
+    restartGame() {
+        ScreenManager.goTo('gameScreen', this);
+        
+        setTimeout(() => {
+            this.resizeCanvas();
+            this.resetGame();
+            this.gameRunning = true;
+            this.gameStarted = false;
+            const h = document.getElementById('tapHint'); if (h) h.classList.remove('hidden');
+            const b = document.getElementById('gameBackBtn'); if (b) b.classList.remove('game-hidden');
+            SoundManager.resume();
+            this.lastTime = null;
+            this.accumulator = 0;
+            this.gameLoop();
+        }, 600); // ⬅️ Ждём полного завершения перехода
+    }
+
     resetGame() {
         this.bird = { x: 80, y: 300, velocity: 0, radius: 15 };
         this.pipes = []; this.coins = []; this.particles = [];
@@ -636,15 +835,12 @@ class FlappyGame {
         const s = document.getElementById('score'); if (s) s.textContent = '0';
         const c = document.getElementById('gameCoinCount'); if (c) c.textContent = '0';
     }
-    
-    // ⚡ ГЛАВНЫЙ ЦИКЛ: requestAnimationFrame + Fixed Timestep
-    // Ключевое: используем performance.now() для точного времени, независимо от RAF timestamp
+
     gameLoop() {
         if (!this.gameRunning) return;
         
         const now = performance.now();
         
-        // Первый кадр — инициализация
         if (this.lastTime === null) {
             this.lastTime = now;
             try { this.render(); } catch (e) {}
@@ -655,14 +851,11 @@ class FlappyGame {
         let dt = (now - this.lastTime) / 1000;
         this.lastTime = now;
         
-        // Защита от больших скачков (сворачивание вкладки, лаги)
         if (dt > 0.1) dt = 0.1;
         if (dt <= 0) dt = 1/60;
         
         this.accumulator += dt;
         
-        // ⚡ Фиксированный шаг логики (ровно 60 раз в секунду)
-        // Защита от "спирали смерти": максимум 5 update за один кадр
         let updates = 0;
         while (this.accumulator >= this.FIXED_DT && updates < 5) {
             this.update();
@@ -670,7 +863,6 @@ class FlappyGame {
             updates++;
         }
         
-        // Если накопили слишком много — сбрасываем (предотвращает бесконечные догонялки)
         if (this.accumulator > this.FIXED_DT * 5) {
             this.accumulator = 0;
         }
@@ -679,8 +871,7 @@ class FlappyGame {
         
         this.animationId = requestAnimationFrame(() => this.gameLoop());
     }
-    
-    // ⚡ ЛОГИКА (вызывается ровно 60 раз в секунду)
+
     update() {
         this.frameCount++;
         
@@ -689,19 +880,16 @@ class FlappyGame {
             return;
         }
         
-        // Физика птицы
         this.bird.velocity += this.gravity;
         if (this.bird.velocity > this.terminalVelocity) this.bird.velocity = this.terminalVelocity;
         this.bird.y += this.bird.velocity;
         
-        // Спавн труб
         if (this.frameCount % this.pipeInterval === 0) {
             this.addPipe();
             this.pipesPassed++;
             if (this.pipesPassed % 3 === 0 || this.pipesPassed % 4 === 0) this.addCoin();
         }
         
-        // Движение труб
         for (let i = this.pipes.length - 1; i >= 0; i--) {
             const pipe = this.pipes[i];
             pipe.x -= this.pipeSpeed;
@@ -714,13 +902,10 @@ class FlappyGame {
                 document.getElementById('score').textContent = this.score;
             }
             
-            // ⚡ ИСПРАВЛЕНО: удаляем по ВИРТУАЛЬНОМУ левому краю (не зависит от размера экрана)
-            if (pipe.x + this.pipeWidth < -50) {
-                this.pipes.splice(i, 1);
-            }
+            // ✅ ИСПРАВЛЕНО: удаляем только когда труба ушла за левый край видимой области
+            if (pipe.x + this.pipeWidth < this.visibleLeft - 50) this.pipes.splice(i, 1);
         }
         
-        // Движение монет
         for (let i = this.coins.length - 1; i >= 0; i--) {
             const coin = this.coins[i];
             coin.x -= this.pipeSpeed;
@@ -734,36 +919,34 @@ class FlappyGame {
                 this.coins.splice(i, 1);
                 continue;
             }
-            if (coin.x + coin.radius < -50) this.coins.splice(i, 1);
+            // ✅ ИСПРАВЛЕНО: удаляем только когда монета ушла за левый край
+            if (coin.x + coin.radius < this.visibleLeft - 50) this.coins.splice(i, 1);
         }
         
-        // Частицы
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
             p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life--;
             if (p.life <= 0) this.particles.splice(i, 1);
         }
         
-        // Границы
         if (this.bird.y + this.bird.radius > this.VIRTUAL_HEIGHT || this.bird.y - this.bird.radius < 0) {
             this.gameOver();
         }
     }
-    
-    // ⚡ ИСПРАВЛЕНО: спавн труб по VIRTUAL_WIDTH (фиксированная позиция)
-    // Теперь на любом устройстве трубы появляются на одном и том же расстоянии от птицы
+
     addPipe() {
         const min = 60;
         const max = this.VIRTUAL_HEIGHT - this.pipeGap - min;
         const top = Math.random() * (max - min) + min;
         this.pipes.push({
-            x: this.VIRTUAL_WIDTH + 50,  // всегда 50 пикс правее виртуального правого края
+            // ✅ ИСПРАВЛЕНО: появляется ЗА правой границей видимой области
+            x: this.visibleRight + 50,
             topHeight: top,
             bottomY: top + this.pipeGap,
             passed: false
         });
     }
-    
+
     addCoin() {
         const last = this.pipes[this.pipes.length - 1];
         if (last) {
@@ -774,7 +957,7 @@ class FlappyGame {
             });
         }
     }
-    
+
     addParticles(x, y, color) {
         for (let i = 0; i < 12; i++) {
             this.particles.push({
@@ -785,7 +968,7 @@ class FlappyGame {
             });
         }
     }
-    
+
     checkCollision(pipe) {
         const bL = this.bird.x - this.bird.radius; const bR = this.bird.x + this.bird.radius;
         const bT = this.bird.y - this.bird.radius; const bB = this.bird.y + this.bird.radius;
@@ -794,7 +977,7 @@ class FlappyGame {
         }
         return false;
     }
-    
+
     async gameOver() {
         this.stopGame();
         SoundManager.playCrash();
@@ -804,14 +987,15 @@ class FlappyGame {
         if (this.score > gameState.bestScore) { gameState.bestScore = this.score; isNew = true; }
         await YandexAPI.savePlayerData(gameState);
         if (isNew && this.score > 0) await YandexAPI.submitScore(this.score);
-        this.showScreen('deathScreen');
+        
         document.getElementById('finalScore').textContent = this.score;
         document.getElementById('earnedCoins').textContent = this.earnedCoins;
         document.getElementById('bestScore').textContent = gameState.bestScore;
+        
+        ScreenManager.goTo('deathScreen', this);
     }
-    
-    async showRecords() {
-        this.showScreen('recordsScreen');
+
+    async loadLeaderboard() {
         const list = document.getElementById('leaderboardList');
         list.innerHTML = '<li style="justify-content:center;background:transparent;">Загрузка...</li>';
         const players = await YandexAPI.getLeaderboard();
@@ -831,7 +1015,7 @@ class FlappyGame {
             list.appendChild(li);
         });
     }
-    
+
     render() {
         const theme = THEMES[gameState.theme] || THEMES.day;
         const ctx = this.ctx;
@@ -898,7 +1082,7 @@ class FlappyGame {
             ctx.fillStyle = rightGrad; ctx.fillRect(this.displayWidth - this.offsetX, 0, this.offsetX, this.canvas.height);
         }
     }
-    
+
     drawClouds(theme) {
         const ctx = this.ctx;
         ctx.fillStyle = theme.cloudColor;
@@ -913,7 +1097,7 @@ class FlappyGame {
             ctx.fill();
         }
     }
-    
+
     drawGround(theme) {
         const ctx = this.ctx;
         const startX = this.visibleLeft - 20;
@@ -930,7 +1114,7 @@ class FlappyGame {
             ctx.fillStyle = theme.ground; ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 10, totalW, 10);
         }
     }
-    
+
     drawPipe(pipe, theme) {
         const ctx = this.ctx;
         if (theme.hasTrees) {
@@ -950,7 +1134,7 @@ class FlappyGame {
         ctx.fillRect(pipe.x - 5, pipe.topHeight - 20, this.pipeWidth + 10, 20);
         ctx.fillRect(pipe.x - 5, pipe.bottomY, this.pipeWidth + 10, 20);
     }
-    
+
     drawTree(x, y, height, topDown, theme) {
         if (height <= 0) return;
         const ctx = this.ctx; ctx.save();
@@ -1009,7 +1193,7 @@ class FlappyGame {
         }
         ctx.restore(); ctx.globalAlpha = 1;
     }
-    
+
     drawCoin(coin) {
         const ctx = this.ctx; ctx.save(); ctx.translate(coin.x, coin.y);
         const sc = Math.abs(Math.cos(this.frameCount * 0.1));
@@ -1021,7 +1205,7 @@ class FlappyGame {
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText('$', 0, 0); ctx.restore();
     }
-    
+
     drawBird() {
         const ctx = this.ctx; ctx.save(); ctx.translate(this.bird.x, this.bird.y);
         let angle = 0;
@@ -1031,7 +1215,7 @@ class FlappyGame {
         catch (e) { this.drawStandardBird(this.frameCount * 0.05); }
         ctx.restore();
     }
-    
+
     drawSkin(t, k) {
         switch(k) {
             case 'standard': this.drawStandardBird(t); break; case 'chicken': this.drawChicken(t); break;
@@ -1041,7 +1225,7 @@ class FlappyGame {
             default: this.drawStandardBird(t);
         }
     }
-    
+
     drawStandardBird(t) {
         const ctx = this.ctx;
         ctx.fillStyle = '#FFD700'; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.fill();
@@ -1053,7 +1237,7 @@ class FlappyGame {
         ctx.fillStyle = '#FF6347'; ctx.beginPath();
         ctx.moveTo(13, 0); ctx.lineTo(20, -3); ctx.lineTo(20, 3); ctx.closePath(); ctx.fill();
     }
-    
+
     drawChicken(t) {
         const ctx = this.ctx;
         const bob = Math.sin(t * 2) * 2;
@@ -1073,7 +1257,7 @@ class FlappyGame {
         ctx.fillStyle = '#FFA500'; ctx.beginPath();
         ctx.moveTo(12, bob); ctx.lineTo(19, bob - 2 - bo); ctx.lineTo(19, bob + 2 + bo); ctx.closePath(); ctx.fill();
     }
-    
+
     drawParrot(t) {
         const ctx = this.ctx;
         const w = Math.sin(t * 2) * 3;
@@ -1087,7 +1271,7 @@ class FlappyGame {
         ctx.moveTo(14, w - 7); ctx.quadraticCurveTo(22, w - 9, 20, w - 4);
         ctx.quadraticCurveTo(18, w - 5, 14, w - 5); ctx.closePath(); ctx.fill();
     }
-    
+
     drawDragon(t) {
         const ctx = this.ctx;
         for (let i = 0; i < 6; i++) {
@@ -1107,7 +1291,7 @@ class FlappyGame {
         ctx.fillStyle = '#FFFF00'; ctx.beginPath(); ctx.arc(8, -4, 4, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(9, -4, 1.5, 0, Math.PI * 2); ctx.fill();
     }
-    
+
     drawPlane(t) {
         const ctx = this.ctx;
         const sh = Math.sin(t * 15) * 0.5;
@@ -1126,7 +1310,7 @@ class FlappyGame {
         ctx.fillStyle = '#87CEEB'; ctx.fillRect(-2, -4, 5, 5); ctx.fillRect(6, -4, 5, 5);
         ctx.restore();
     }
-    
+
     drawRocket(t) {
         const ctx = this.ctx;
         for (let i = 0; i < 10; i++) {
@@ -1149,7 +1333,7 @@ class FlappyGame {
         ctx.strokeStyle = '#999'; ctx.lineWidth = 1.5; ctx.stroke();
         ctx.restore();
     }
-    
+
     drawGhost(t) {
         const ctx = this.ctx;
         const a = 0.55 + Math.sin(t * 2.5) * 0.25; const w = Math.sin(t * 1.5) * 5;
@@ -1166,7 +1350,7 @@ class FlappyGame {
         ctx.beginPath(); ctx.arc(5, w - 2, 3, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(0, w + 4, 3, 0, Math.PI * 2); ctx.fill();
     }
-    
+
     drawGoldBird(t) {
         const ctx = this.ctx;
         for (let i = 0; i < 12; i++) {
