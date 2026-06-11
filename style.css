@@ -1,3 +1,22 @@
+/* ==========================================
+   CSS-ПЕРЕМЕННЫЕ ДЛЯ ТЕМ (анимируются через @property)
+========================================== */
+@property --sky-top {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #87CEEB;
+}
+@property --sky-mid {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #B0E0E6;
+}
+@property --sky-bottom {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #E0F6FF;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -5,17 +24,43 @@
     -webkit-tap-highlight-color: transparent;
 }
 
+html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: none;
+}
+
 body {
     font-family: 'Segoe UI', Roboto, Arial, sans-serif;
-    background: linear-gradient(to bottom, #87CEEB 0%, #B0E0E6 50%, #E0F6FF 100%);
+    background: linear-gradient(
+        to bottom,
+        var(--sky-top) 0%,
+        var(--sky-mid) 50%,
+        var(--sky-bottom) 100%
+    );
     min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
-    overflow: hidden;
-    user-select: none;
-    -webkit-user-select: none;
     position: relative;
+    /* Плавная смена темы */
+    transition:
+        --sky-top 600ms ease,
+        --sky-mid 600ms ease,
+        --sky-bottom 600ms ease;
 }
 
 /* ==========================================
@@ -35,22 +80,19 @@ body {
     max-width: 500px;
     margin: 0 auto;
     right: 0;
-
-    /* Начальное состояние: невидим и некликабельн */
+    
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-
-    /* Плавные переходы */
-    transition: 
+    
+    transition:
         opacity 250ms cubic-bezier(0.4, 0, 0.2, 1),
         transform 250ms cubic-bezier(0.4, 0, 0.2, 1),
         visibility 0ms linear 250ms;
-
+    
     transform: translateX(0);
 }
 
-/* Активный экран — виден и кликабельн */
 .screen.active {
     opacity: 1;
     visibility: visible;
@@ -63,7 +105,7 @@ body {
 }
 
 /* ==========================================
-   ПОЛНОЭКРАННЫЕ ИГРОВЫЕ ЭКРАНЫ (особая обработка)
+   ПОЛНОЭКРАННЫЕ ИГРОВЫЕ ЭКРАНЫ
 ========================================== */
 .game-screen {
     max-width: none;
@@ -72,12 +114,9 @@ body {
     position: fixed;
     z-index: 100;
 }
-/* ✅ Убрали .game-screen.active { display: flex; } — оно было избыточным
-      и ломало плавность, так как display не анимируется.
-      .game-screen наследует display: flex от .screen */
 
 /* ==========================================
-   ЧЁРНЫЙ ОВЕРЛЕЙ ДЛЯ FADE-THROUGH-BLACK
+   ЧЁРНЫЙ ОВЕРЛЕЙ
 ========================================== */
 .black-overlay {
     position: fixed;
@@ -185,15 +224,22 @@ body {
 }
 
 /* ==========================================
-   CANVAS МЕНЮ
+   CANVAS МЕНЮ (фон зависит от темы)
 ========================================== */
 #menuCanvas {
-    background: linear-gradient(to bottom, #87CEEB 0%, #B0E0E6 100%);
+    background: linear-gradient(
+        to bottom,
+        var(--sky-top) 0%,
+        var(--sky-bottom) 100%
+    );
     border-radius: 20px;
     box-shadow:
         0 8px 20px rgba(0,0,0,0.25),
         inset 0 0 0 3px rgba(255,255,255,0.3);
     margin: 20px 0;
+    transition:
+        --sky-top 600ms ease,
+        --sky-bottom 600ms ease;
 }
 
 /* ==========================================
@@ -251,9 +297,16 @@ body {
         0 4px 8px rgba(0,0,0,0.3);
 }
 
-.menu-btn.primary { background: linear-gradient(to bottom, #FF6B6B 0%, #FF4757 100%); }
-.menu-btn.secondary { background: linear-gradient(to bottom, #4A90E2 0%, #357ABD 100%); }
-.menu-btn.accent { background: linear-gradient(to bottom, #FFD700 0%, #FFA500 100%); color: #333; }
+.menu-btn.primary {
+    background: linear-gradient(to bottom, #FF6B6B 0%, #FF4757 100%);
+}
+.menu-btn.secondary {
+    background: linear-gradient(to bottom, #4A90E2 0%, #357ABD 100%);
+}
+.menu-btn.accent {
+    background: linear-gradient(to bottom, #FFD700 0%, #FFA500 100%);
+    color: #333;
+}
 
 /* ==========================================
    HEADER С КНОПКОЙ НАЗАД
@@ -287,7 +340,9 @@ body {
     transform: scale(1.05);
 }
 
-.back-btn:active { transform: scale(0.95); }
+.back-btn:active {
+    transform: scale(0.95);
+}
 
 /* ==========================================
    СЕТКА СКИНОВ
@@ -321,7 +376,9 @@ body {
     border: 3px solid transparent;
 }
 
-.skin-card:hover { transform: translateY(-3px); }
+.skin-card:hover {
+    transform: translateY(-3px);
+}
 
 .skin-card.selected {
     border-color: #4CAF50;
@@ -333,7 +390,15 @@ body {
     width: 80px;
     height: 80px;
     border-radius: 10px;
-    background: linear-gradient(to bottom, #E0F6FF, #B0E0E6);
+    /* Фон зависит от темы */
+    background: linear-gradient(
+        to bottom,
+        var(--sky-top),
+        var(--sky-bottom)
+    );
+    transition:
+        --sky-top 600ms ease,
+        --sky-bottom 600ms ease;
 }
 
 .skin-name { font-weight: bold; font-size: 0.9em; color: #333; }
@@ -754,7 +819,6 @@ body {
     50% { opacity: 1; transform: scale(1.2); }
 }
 
-/* Показ оверлея только на мобильных в портрете */
 @media (max-width: 1024px) and (orientation: portrait) {
     .rotate-overlay.mobile-device {
         display: flex !important;
@@ -781,7 +845,6 @@ body {
     }
 }
 
-/* Блокировка взаимодействия во время переходов */
 body.transitioning {
     pointer-events: none !important;
 }
