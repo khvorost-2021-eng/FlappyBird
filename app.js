@@ -74,7 +74,7 @@ function applyThemeToApp() {
 applyThemeToApp();
 
 // ==========================================
-// 📱 ОПРЕДЕЛЕНИЕ УСТРОЙСТВА (МОБИЛЬНОЕ / ДЕСКТОП)
+// 📱 ОПРЕДЕЛЕНИЕ УСТРОЙСТВА
 // ==========================================
 const DeviceInfo = {
     isMobile: (function() {
@@ -93,14 +93,14 @@ const DeviceInfo = {
 };
 
 // ==========================================
-// 📱 ПАРАМЕТРЫ ИГРЫ ДЛЯ МОБИЛОК (можно легко менять)
+// 📱 ПАРАМЕТРЫ ИГРЫ ДЛЯ МОБИЛОК
 // ==========================================
 const MOBILE_GAME_PARAMS = {
-    pipeSpeed: 280,       // Скорость труб (на ПК: 350)
-    pipeGap: 175,         // Расстояние между трубами (на ПК: 165)
-    pipeInterval: 0.85,   // Интервал появления труб, сек (на ПК: 0.76)
-    gravity: 1800,        // Гравитация (на ПК: 2000)
-    jumpStrength: -550    // Сила прыжка (на ПК: -600)
+    pipeSpeed: 280,
+    pipeGap: 175,
+    pipeInterval: 0.85,
+    gravity: 1800,
+    jumpStrength: -550
 };
 
 // ==========================================
@@ -439,6 +439,16 @@ const ScreenManager = {
 
         if (targetId === 'menuScreen') applyThemeToApp();
 
+        // ✅ ИСПРАВЛЕНИЕ: Рендер скинов СРАЗУ
+        if (targetId === 'skinsScreen' && game) {
+            game.renderSkinsGrid();
+        }
+
+        // ✅ ИСПРАВЛЕНИЕ БАГА 3: Рендерим темы СРАЗУ, без задержки
+        if (targetId === 'settingsScreen' && game) {
+            game.renderSettingsScreen();
+        }
+
         if (targetId === 'menuScreen' && game) {
             game.updateMenuPreview();
         }
@@ -458,14 +468,10 @@ const ScreenManager = {
                 this.currentScreen = targetId;
                 this.isTransitioning = false;
 
-                if (targetId === 'skinsScreen' && game) {
-                    game.renderSkinsGrid();
-                } else if (targetId === 'settingsScreen' && game) {
-                    game.renderSettingsScreen();
-                } else if (targetId === 'menuScreen' && game) {
+                // ✅ УБРАЛИ renderSettingsScreen отсюда (было через 280ms)
+                if (targetId === 'menuScreen' && game) {
                     applyThemeToApp();
                     game.updateUIFromState();
-                    game.updateMenuPreview();
                 }
             }, 280);
         }, 280);
@@ -541,6 +547,7 @@ class FlappyGame {
 
         this.gradientCache = new Map();
         this.lastThemeKey = null;
+        this._menuPreviewKey = null;
 
         this.generateClouds();
         this.bindEvents();
@@ -859,8 +866,10 @@ class FlappyGame {
         const theme = THEMES[themeKey];
         let frame = 0;
         const render = () => {
-            const ss = document.getElementById('settingsScreen');
-            if (!ss || !ss.classList.contains('active')) { this.themePreviewAnimIds.delete(canvas); return; }
+            if (!document.body.contains(canvas)) {
+                this.themePreviewAnimIds.delete(canvas);
+                return;
+            }
             const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
             g.addColorStop(0, theme.skyTop); g.addColorStop(1, theme.skyBottom);
             ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -903,18 +912,32 @@ class FlappyGame {
         requestAnimationFrame(render);
     }
 
+    // ✅ ИСПРАВЛЕНИЕ БАГА 2: Плавное переключение тем без пересоздания карточек
     async selectTheme(k) {
         if (!THEMES[k]) return;
         gameState.theme = k;
         applyThemeToApp();
         this.updateMenuPreview();
         await YandexAPI.savePlayerData(gameState);
-        this.renderSettingsScreen();
+
+        // Просто переключаем класс selected, не пересоздаём карточки
+        const cards = document.querySelectorAll('.theme-card');
+        const keys = Object.keys(THEMES);
+        cards.forEach((card, i) => {
+            card.classList.toggle('selected', keys[i] === k);
+        });
     }
 
     startMenuPreview() {
         applyThemeToApp();
         if (!this.menuCanvas || !this.menuCtx) return;
+
+        const currentTheme = gameState.theme + '_' + gameState.currentSkin;
+        if (this.menuAnimId && this._menuPreviewKey === currentTheme) {
+            return;
+        }
+        this._menuPreviewKey = currentTheme;
+
         if (this.menuAnimId) {
             cancelAnimationFrame(this.menuAnimId);
             this.menuAnimId = null;
@@ -1021,7 +1044,7 @@ class FlappyGame {
         let frame = 0;
         const render = () => {
             const ss = document.getElementById('skinsScreen');
-            if (!ss || !ss.classList.contains('active')) { this.skinPreviewAnimId = null; return; }
+            if (!ss) { this.skinPreviewAnimId = null; return; }
             ctxs.forEach(({ ctx, canvas, skinKey }) => {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 const theme = THEMES[gameState.theme] || THEMES.day;
@@ -1235,10 +1258,18 @@ class FlappyGame {
         }
     }
 
+    // ✅ ИСПРАВЛЕНИЕ БАГА 1: Гарантируем корректную генерацию труб
     addPipe() {
-        const min = 60;
-        const max = this.VIRTUAL_HEIGHT - this.pipeGap - min;
-        const top = Math.random() * (max - min) + min;
+        const theme = THEMES[gameState.theme] || THEMES.day;
+        const groundHeight = theme.hasTrees ? 15 : 10;
+        const minVisible = 50;  // Минимум 50px трубы видно на экране
+        
+        // Верхняя труба: минимум minVisible px видно сверху
+        const minTop = minVisible;
+        // Нижняя труба: минимум minVisible px видно сверху земли
+        const maxTop = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - minVisible;
+        
+        const top = Math.random() * (maxTop - minTop) + minTop;
         this.pipes.push({
             x: this.visibleRight + 50,
             topHeight: top,
@@ -1498,11 +1529,13 @@ class FlappyGame {
             return grad;
         });
         ctx.fillStyle = g;
-        ctx.fillRect(pipe.x, 0, this.pipeWidth, pipe.topHeight);
+        ctx.fillRect(pipe.x, -100, this.pipeWidth, pipe.topHeight + 100);
         ctx.fillRect(pipe.x, pipe.bottomY, this.pipeWidth, this.VIRTUAL_HEIGHT - pipe.bottomY);
         ctx.strokeStyle = theme.pipeDark;
         ctx.lineWidth = 2;
-        ctx.strokeRect(pipe.x, 0, this.pipeWidth, pipe.topHeight);
+        if (pipe.topHeight > 0) {
+            ctx.strokeRect(pipe.x, 0, this.pipeWidth, pipe.topHeight);
+        }
         ctx.strokeRect(pipe.x, pipe.bottomY, this.pipeWidth, this.VIRTUAL_HEIGHT - pipe.bottomY);
         ctx.fillStyle = theme.pipeTop;
         ctx.fillRect(pipe.x - 5, pipe.topHeight - 20, this.pipeWidth + 10, 20);

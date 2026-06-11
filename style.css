@@ -713,3 +713,37 @@ body {
     .menu-btn { padding: 12px 30px; font-size: 1.1em; }
     .menu-buttons { gap: 8px; }
 }
+
+/* ==========================================
+🎨 КАСТОМНЫЙ СКРОЛЛБАР (ИСПРАВЛЕНИЕ БАГА 2)
+========================================== */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    margin: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, #FFD700, #FFA500);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    min-height: 30px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(to bottom, #FF6B6B, #FF4757);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+}
+
+/* Для Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #FFD700 rgba(0, 0, 0, 0.1);
+}
