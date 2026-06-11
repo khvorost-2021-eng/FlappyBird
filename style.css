@@ -1,5 +1,5 @@
 /* ==========================================
-   CSS-ПЕРЕМЕННЫЕ ДЛЯ ТЕМ
+CSS-ПЕРЕМЕННЫЕ ДЛЯ ТЕМ
 ========================================== */
 @property --sky-top { syntax: '<color>'; inherits: true; initial-value: #87CEEB; }
 @property --sky-mid { syntax: '<color>'; inherits: true; initial-value: #B0E0E6; }
@@ -34,7 +34,7 @@ body {
 }
 
 /* ==========================================
-   ЭКРАНЫ
+ЭКРАНЫ
 ========================================== */
 .screen {
     position: absolute;
@@ -76,7 +76,7 @@ body {
 }
 
 /* ==========================================
-   ЗАГОЛОВКИ И ЭЛЕМЕНТЫ
+ЗАГОЛОВКИ И ЭЛЕМЕНТЫ
 ========================================== */
 .game-title {
     font-size: 2.8em;
@@ -138,6 +138,7 @@ body {
 }
 
 .coin-icon { font-size: 1.2em; animation: coinSpin 2s infinite linear; }
+
 @keyframes coinSpin {
     0%, 100% { transform: rotateY(0deg); }
     50% { transform: rotateY(180deg); }
@@ -226,7 +227,7 @@ body {
 .back-btn:active { transform: scale(0.95); }
 
 /* ==========================================
-   СКИНЫ
+СКИНЫ
 ========================================== */
 #skinsGrid {
     display: grid;
@@ -292,7 +293,7 @@ body {
 .skin-btn:not(:disabled):hover { transform: scale(1.05); }
 
 /* ==========================================
-   ИГРОВОЙ ЭКРАН
+ИГРОВОЙ ЭКРАН
 ========================================== */
 #gameCanvas {
     width: 100%; height: 100%;
@@ -336,7 +337,7 @@ body {
 }
 
 /* ==========================================
-   ЭКРАН СМЕРТИ
+ЭКРАН СМЕРТИ
 ========================================== */
 #finalStats {
     background: rgba(255, 255, 255, 0.97);
@@ -372,7 +373,7 @@ body {
 .stat-row.highlight strong { color: #B8860B; }
 
 /* ==========================================
-   ЛИДЕРБОРД
+ЛИДЕРБОРД
 ========================================== */
 #leaderboard {
     background: rgba(255, 255, 255, 0.97);
@@ -422,7 +423,7 @@ body {
 }
 
 /* ==========================================
-   НАСТРОЙКИ
+НАСТРОЙКИ
 ========================================== */
 .settings-container {
     width: 100%;
@@ -567,218 +568,45 @@ body {
 }
 
 /* ==========================================
-   ОВЕРЛЕЙ ПОВОРОТА (КРАСИВЫЙ)
-========================================== */
-.rotate-overlay {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100vw; height: 100vh;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-    z-index: 99999;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    color: white;
-    pointer-events: all;
-    overflow: hidden;
-    padding: 20px;
-}
-
-.rotate-overlay::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background:
-        radial-gradient(circle at 20% 30%, rgba(255, 215, 0, 0.15) 0%, transparent 50%),
-        radial-gradient(circle at 80% 70%, rgba(255, 107, 107, 0.15) 0%, transparent 50%);
-    animation: bgShift 8s ease-in-out infinite;
-    pointer-events: none;
-}
-
-@keyframes bgShift {
-    0%, 100% { opacity: 0.8; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.1); }
-}
-
-.rotate-content {
-    text-align: center;
-    padding: 20px;
-    position: relative;
-    z-index: 1;
-    max-width: 420px;
-    animation: contentFadeIn 0.6s ease-out;
-}
-
-@keyframes contentFadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.rotate-phone {
-    position: relative;
-    width: 140px; height: 140px;
-    margin: 0 auto 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.phone-body {
-    width: 60px; height: 100px;
-    background: linear-gradient(145deg, #4a4a4a, #2a2a2a);
-    border-radius: 10px;
-    position: relative;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    animation: phoneRotate 2.5s ease-in-out infinite;
-    border: 2px solid #5a5a5a;
-}
-
-.phone-screen {
-    position: absolute;
-    top: 8px; left: 4px;
-    width: calc(100% - 8px);
-    height: calc(100% - 20px);
-    background: linear-gradient(135deg, #87CEEB, #B0E0E6);
-    border-radius: 4px;
-}
-
-.phone-button {
-    position: absolute;
-    bottom: 4px; left: 50%;
-    transform: translateX(-50%);
-    width: 12px; height: 12px;
-    background: #1a1a1a;
-    border-radius: 50%;
-    border: 1px solid #333;
-}
-
-.rotate-arrow {
-    position: absolute;
-    top: -10px; right: -10px;
-    width: 60px; height: 60px;
-    animation: arrowSpin 2s linear infinite;
-    filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.5));
-}
-
-.rotate-arrow svg { width: 100%; height: 100%; }
-
-.rotate-title {
-    font-size: 2em;
-    margin-bottom: 15px;
-    font-weight: bold;
-    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-.rotate-subtitle {
-    font-size: 1.1em;
-    line-height: 1.6;
-    opacity: 0.85;
-    margin-bottom: 30px;
-}
-
-.rotate-hint {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-}
-
-.hint-dot {
-    width: 10px; height: 10px;
-    background: rgba(255, 215, 0, 0.4);
-    border-radius: 50%;
-    animation: hintPulse 1.5s ease-in-out infinite;
-}
-
-.hint-dot:nth-child(2) { animation-delay: 0.2s; }
-.hint-dot:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes phoneRotate {
-    0%, 100% { transform: rotate(0deg); }
-    30% { transform: rotate(0deg); }
-    50% { transform: rotate(-90deg); }
-    80% { transform: rotate(-90deg); }
-}
-
-@keyframes arrowSpin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-@keyframes hintPulse {
-    0%, 100% { opacity: 0.3; transform: scale(0.8); }
-    50% { opacity: 1; transform: scale(1.3); background: #FFD700; }
-}
-
-/* ==========================================
-   БЛОКИРОВКА В ПОРТРЕТЕ
-========================================== */
-@media (max-width: 1024px) and (orientation: portrait) {
-    .rotate-overlay.mobile-device {
-        display: flex !important;
-    }
-    body.rotate-locked .screen,
-    body.rotate-locked #gameCanvas,
-    body.rotate-locked .game-screen {
-        pointer-events: none !important;
-        filter: blur(8px) brightness(0.3);
-        opacity: 0.3;
-        transition: all 0.4s ease;
-    }
-}
-
-@media (min-width: 1025px) {
-    .rotate-overlay { display: none !important; }
-}
-
-@media (orientation: landscape) {
-    .rotate-overlay { display: none !important; }
-}
-
-/* ==========================================
-   📱 АДАПТИВ: ЛАНДШАФТ НА ТЕЛЕФОНАХ
+📱 АДАПТИВ: ЛАНДШАФТ НА ТЕЛЕФОНАХ
 ========================================== */
 @media (orientation: landscape) and (max-height: 500px) {
     .screen {
         padding: 8px 12px;
         justify-content: flex-start;
     }
-    
+
     .game-title {
         font-size: 1.8em;
         margin: 5px 0 8px;
     }
-    
+
     .screen-title {
         font-size: 1.4em;
         margin: 5px 0 10px;
     }
-    
+
     .player-info {
         padding: 6px 12px;
         margin-bottom: 5px;
         gap: 8px;
     }
-    
+
     .player-avatar { width: 30px; height: 30px; }
     .player-name { font-size: 0.95em; }
-    
+
     .coin-display {
         padding: 6px 14px;
         font-size: 1.1em;
         margin-bottom: 8px;
     }
-    
+
     #menuCanvas {
         width: 200px !important;
         height: 130px !important;
         margin: 8px 0;
     }
-    
-    /* Кнопки в 2 колонки в ландшафте */
+
     .menu-buttons {
         flex-direction: row;
         flex-wrap: wrap;
@@ -786,7 +614,7 @@ body {
         max-width: 100%;
         justify-content: center;
     }
-    
+
     .menu-btn {
         padding: 10px 20px;
         font-size: 0.95em;
@@ -794,71 +622,65 @@ body {
         min-width: 130px;
         max-width: 180px;
     }
-    
+
     .screen-header { padding: 2px 0 8px; }
     .back-btn { padding: 5px 10px; font-size: 0.85em; }
-    
-    /* Скины: 4 колонки */
+
     #skinsGrid {
         grid-template-columns: repeat(4, 1fr);
         gap: 8px;
         padding: 8px;
         max-height: calc(100vh - 100px);
     }
-    
+
     .skin-card { padding: 6px; gap: 3px; }
     .skin-preview { width: 55px; height: 55px; }
     .skin-name { font-size: 0.75em; }
     .skin-price { font-size: 0.7em; }
     .skin-btn { padding: 4px 8px; font-size: 0.7em; }
-    
-    /* Настройки: секции в ряд */
+
     .settings-container {
         flex-direction: row;
         gap: 10px;
         max-height: calc(100vh - 80px);
     }
-    
+
     .settings-section {
         flex: 1;
         padding: 12px;
     }
-    
+
     .section-title { font-size: 1em; margin-bottom: 8px; padding-bottom: 5px; }
-    
+
     .themes-grid {
         grid-template-columns: repeat(4, 1fr);
         gap: 8px;
     }
-    
+
     .sound-label { font-size: 0.9em; margin-bottom: 5px; }
     .mute-btn { width: 32px; height: 32px; font-size: 1em; }
     .styled-slider { height: 6px; }
     .styled-slider::-webkit-slider-thumb { width: 16px; height: 16px; }
-    
-    /* Экран смерти: компактный */
+
     #finalStats {
         padding: 12px 18px;
         margin: 8px 0;
     }
-    
+
     .stat-row { padding: 6px 3px; font-size: 1em; }
     .stat-row strong { font-size: 1.1em; }
     .stat-row.highlight { padding: 8px 12px; margin: 5px -10px 0; }
-    
-    /* Лидерборд */
+
     #leaderboard { padding: 10px; max-height: calc(100vh - 90px); }
     #leaderboardList li { padding: 8px 12px; font-size: 0.9em; margin: 5px 0; }
     .lb-avatar { width: 24px; height: 24px; }
-    
-    /* Игровой экран: меньше UI */
+
     #score { font-size: 1.8em; top: 10px; }
     #tapHint { font-size: 1.3em; padding: 10px 20px; }
     .back-btn[style*="top: 20px"] { top: 10px !important; left: 10px !important; padding: 6px 12px !important; font-size: 0.85em !important; }
     .coin-display.small[style*="top: 20px"] { top: 10px !important; right: 10px !important; }
 }
 
-/* Ещё меньше экраны (например, iPhone SE landscape) */
 @media (orientation: landscape) and (max-height: 380px) {
     .screen { padding: 5px 8px; }
     .game-title { font-size: 1.5em; margin: 3px 0 5px; }
@@ -873,7 +695,7 @@ body {
 }
 
 /* ==========================================
-   ОБЩИЙ АДАПТИВ
+ОБЩИЙ АДАПТИВ
 ========================================== */
 @media (max-width: 500px) and (orientation: portrait) {
     .screen { padding: 15px 10px; }
@@ -890,13 +712,4 @@ body {
     #menuCanvas { width: 260px; height: 170px; margin: 10px 0; }
     .menu-btn { padding: 12px 30px; font-size: 1.1em; }
     .menu-buttons { gap: 8px; }
-}
-
-/* Компактный rotate overlay на маленьких экранах */
-@media (max-height: 400px) and (orientation: portrait) {
-    .rotate-title { font-size: 1.4em; }
-    .rotate-subtitle { font-size: 0.9em; margin-bottom: 15px; }
-    .rotate-phone { width: 90px; height: 90px; margin-bottom: 15px; }
-    .phone-body { width: 40px; height: 70px; }
-    .rotate-arrow { width: 40px; height: 40px; }
 }

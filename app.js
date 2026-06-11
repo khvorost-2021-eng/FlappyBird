@@ -71,11 +71,10 @@ function applyThemeToApp() {
     document.body.style.setProperty('--sky-mid', theme.appBgMid);
     document.body.style.setProperty('--sky-bottom', theme.appBgBottom);
 }
-
 applyThemeToApp();
 
 // ==========================================
-// ОПРЕДЕЛЕНИЕ МОБИЛЬНОГО УСТРОЙСТВА
+// 📱 ОПРЕДЕЛЕНИЕ УСТРОЙСТВА (МОБИЛЬНОЕ / ДЕСКТОП)
 // ==========================================
 const DeviceInfo = {
     isMobile: (function() {
@@ -85,11 +84,29 @@ const DeviceInfo = {
             (window.innerWidth <= 1024)
         );
     })(),
+    isDesktop: (function() {
+        return !(('ontouchstart' in window) || (navigator.maxTouchPoints > 0)) && window.innerWidth > 1024;
+    })(),
     isLowEnd: (function() {
-        // Простая эвристика: мобильные устройства считаем low-end
         return window.innerWidth <= 1024 || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2);
     })()
 };
+
+// ==========================================
+// 📱 ПАРАМЕТРЫ ИГРЫ ДЛЯ МОБИЛОК (можно легко менять)
+// ==========================================
+const MOBILE_GAME_PARAMS = {
+    pipeSpeed: 280,       // Скорость труб (на ПК: 350)
+    pipeGap: 175,         // Расстояние между трубами (на ПК: 165)
+    pipeInterval: 0.85,   // Интервал появления труб, сек (на ПК: 0.76)
+    gravity: 1800,        // Гравитация (на ПК: 2000)
+    jumpStrength: -550    // Сила прыжка (на ПК: -600)
+};
+
+// ==========================================
+// 🏆 ДВЕ ОТДЕЛЬНЫЕ ТАБЛИЦЫ ЛИДЕРОВ
+// ==========================================
+const LEADERBOARD_ID = DeviceInfo.isMobile ? 'flappy_mobile' : 'flappy_pc';
 
 // ==========================================
 // ЗВУК
@@ -350,7 +367,7 @@ const YandexAPI = {
         if (!sdkReady || !ysdk) return false;
         try {
             const lb = await ysdk.getLeaderboards();
-            await lb.setLeaderboardScore('flappycores', score);
+            await lb.setLeaderboardScore(LEADERBOARD_ID, score);
             return true;
         } catch (e) { return false; }
     },
@@ -359,7 +376,7 @@ const YandexAPI = {
         if (!sdkReady || !ysdk) return this.getStaticLeaderboard();
         try {
             const lb = await ysdk.getLeaderboards();
-            const r = await lb.getLeaderboardEntries('flappycores', {
+            const r = await lb.getLeaderboardEntries(LEADERBOARD_ID, {
                 quantityTop: 10, quantityAround: 2, includeUser: true
             });
             return r.entries.map(e => ({
@@ -476,7 +493,7 @@ class FlappyGame {
         this.displayWidth = 400;
         this.displayHeight = 600;
 
-        // Физика
+        // Физика (ПК значения)
         this.gravity = 2000;
         this.jumpStrength = -600;
         this.terminalVelocity = 800;
@@ -485,6 +502,15 @@ class FlappyGame {
         this.pipeSpeed = 350;
         this.pipeInterval = 0.76;
         this.pipeTimer = 0;
+
+        // 📱 Применяем мобильные параметры для телефонов
+        if (DeviceInfo.isMobile) {
+            this.pipeSpeed = MOBILE_GAME_PARAMS.pipeSpeed;
+            this.pipeGap = MOBILE_GAME_PARAMS.pipeGap;
+            this.pipeInterval = MOBILE_GAME_PARAMS.pipeInterval;
+            this.gravity = MOBILE_GAME_PARAMS.gravity;
+            this.jumpStrength = MOBILE_GAME_PARAMS.jumpStrength;
+        }
 
         this.FIXED_DT = 1 / 60;
         this.accumulator = 0;
@@ -513,7 +539,6 @@ class FlappyGame {
         this._wasStarted = false;
         this._pausedState = null;
 
-        // 🔧 КЭШ ГРАДИЕНТОВ — создаются один раз, переиспользуются
         this.gradientCache = new Map();
         this.lastThemeKey = null;
 
@@ -525,25 +550,8 @@ class FlappyGame {
         SoundManager.init();
         SoundManager.updateVolumes();
         YandexAPI.init().catch(() => {});
-
-        this.pausedForRotation = false;
-        this.checkMobileOrientation();
-
-        window.addEventListener('orientationchange', () => {
-            setTimeout(() => this.checkMobileOrientation(), 100);
-        });
-
-        if (window.matchMedia) {
-            const pq = window.matchMedia('(orientation: portrait)');
-            const handler = () => this.checkMobileOrientation();
-            if (pq.addEventListener) pq.addEventListener('change', handler);
-            else if (pq.addListener) pq.addListener(handler);
-        }
-
-        this.tryLockOrientation();
     }
 
-    // 🔧 ОПТИМИЗАЦИЯ: кэшированный градиент
     getCachedGradient(key, creator) {
         if (!this.gradientCache.has(key)) {
             this.gradientCache.set(key, creator());
@@ -551,14 +559,12 @@ class FlappyGame {
         return this.gradientCache.get(key);
     }
 
-    // 🔧 ОПТИМИЗАЦИЯ: очистить кэш при смене темы/размера
     invalidateGradientCache() {
         this.gradientCache.clear();
     }
 
     generateClouds() {
         this.clouds = [];
-        // 🔧 На мобильных меньше облаков
         const count = DeviceInfo.isLowEnd ? 5 : 8;
         for (let i = 0; i < count; i++) {
             this.clouds.push({
@@ -572,7 +578,6 @@ class FlappyGame {
 
     generateStars() {
         this.stars = [];
-        // 🔧 На мобильных в 3 раза меньше звёзд
         const count = DeviceInfo.isLowEnd ? 50 : 150;
         for (let i = 0; i < count; i++) {
             this.stars.push({
@@ -748,7 +753,6 @@ class FlappyGame {
         if (!this.canvas) return;
         const gs = document.getElementById('gameScreen');
         if (gs && gs.classList.contains('active')) this.resizeCanvas();
-        this.checkMobileOrientation();
     }
 
     resizeCanvas() {
@@ -771,88 +775,6 @@ class FlappyGame {
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.invalidateGradientCache();
         this.generateStars();
-    }
-
-    checkMobileOrientation() {
-        const overlay = document.getElementById('rotateOverlay');
-        if (!overlay) return;
-
-        const isMobile = (
-            ('ontouchstart' in window) ||
-            (navigator.maxTouchPoints > 0)
-        ) && (window.innerWidth <= 1024 || window.innerHeight <= 1024);
-
-        if (isMobile) {
-            overlay.classList.add('mobile-device');
-            document.body.classList.add('is-mobile');
-            const isPortrait = window.innerHeight > window.innerWidth;
-
-            if (isPortrait) {
-                if (!document.body.classList.contains('rotate-locked')) {
-                    document.body.classList.add('rotate-locked');
-                    if (this.gameRunning) this.pauseForRotation();
-                }
-            } else {
-                if (document.body.classList.contains('rotate-locked')) {
-                    document.body.classList.remove('rotate-locked');
-                    setTimeout(() => {
-                        if (document.getElementById('gameScreen')?.classList.contains('active')) {
-                            this.resizeCanvas();
-                        }
-                        if (this.pausedForRotation) this.resumeAfterRotation();
-                    }, 100);
-                }
-            }
-        } else {
-            overlay.classList.remove('mobile-device');
-            document.body.classList.remove('is-mobile', 'rotate-locked');
-            if (this.pausedForRotation) this.pausedForRotation = false;
-        }
-    }
-
-    tryLockOrientation() {
-        if (screen.orientation && screen.orientation.lock) {
-            screen.orientation.lock('landscape').catch(() => {});
-        }
-    }
-
-    pauseForRotation() {
-        this.pausedForRotation = true;
-        this._pausedState = { wasRunning: this.gameRunning, wasStarted: this.gameStarted };
-        this.gameRunning = false;
-        if (this.animationId) {
-            cancelAnimationFrame(this.animationId);
-            this.animationId = null;
-        }
-        SoundManager.stopMusic();
-        if (SoundManager.audioCtx && SoundManager.audioCtx.state === 'running') {
-            try { SoundManager.audioCtx.suspend(); } catch (e) {}
-        }
-    }
-
-    resumeAfterRotation() {
-        if (!this.pausedForRotation) return;
-        this.pausedForRotation = false;
-
-        if (SoundManager.audioCtx && SoundManager.audioCtx.state === 'suspended') {
-            try { SoundManager.audioCtx.resume(); } catch (e) {}
-        }
-
-        const state = this._pausedState || {};
-        if (state.wasRunning) {
-            this.gameRunning = true;
-            this.lastTime = null;
-            if (state.wasStarted) {
-                this.gameStarted = false;
-                const h = document.getElementById('tapHint');
-                if (h) { h.classList.remove('hidden'); h.textContent = T.tapHint; }
-                const b = document.getElementById('gameBackBtn');
-                if (b) b.classList.remove('game-hidden');
-                SoundManager.stopMusic();
-            }
-            this.gameLoop();
-        }
-        this._pausedState = null;
     }
 
     tap() {
@@ -1337,7 +1259,6 @@ class FlappyGame {
     }
 
     addParticles(x, y, color) {
-        // 🔧 На мобильных меньше частиц
         const count = DeviceInfo.isLowEnd ? 6 : 12;
         for (let i = 0; i < count; i++) {
             this.particles.push({
@@ -1408,12 +1329,10 @@ class FlappyGame {
         });
     }
 
-    // 🔧 ОПТИМИЗИРОВАННЫЙ РЕНДЕР
     render() {
         const theme = THEMES[gameState.theme] || THEMES.day;
         const ctx = this.ctx;
 
-        // 🔧 Кэшированный градиент неба
         const skyGradKey = `sky_${this.canvas.height}_${theme.skyTop}_${theme.skyBottom}`;
         const g = this.getCachedGradient(skyGradKey, () => {
             const grad = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
@@ -1440,7 +1359,6 @@ class FlappyGame {
         const celY = 100;
         const celR = 35 * this.scale;
 
-        // 🔧 На мобильных упрощённое солнце/луна (без свечения)
         if (theme.hasSun) {
             if (!DeviceInfo.isLowEnd) {
                 ctx.fillStyle = theme.sunColor;
@@ -1571,7 +1489,6 @@ class FlappyGame {
             this.drawTree(pipe.x, pipe.bottomY, this.VIRTUAL_HEIGHT - pipe.bottomY, false, theme);
             return;
         }
-        // 🔧 Кэшированный градиент трубы
         const pipeGradKey = `pipe_${this.pipeWidth}_${theme.pipeMain}_${theme.pipeLight}`;
         const g = this.getCachedGradient(pipeGradKey, () => {
             const grad = ctx.createLinearGradient(pipe.x, 0, pipe.x + this.pipeWidth, 0);
@@ -1605,7 +1522,6 @@ class FlappyGame {
             ctx.fillStyle = tg;
             ctx.fillRect(x, y, this.pipeWidth, height);
 
-            // 🔧 На мобильных пропускаем детали дерева
             if (!DeviceInfo.isLowEnd) {
                 ctx.strokeStyle = theme.pipeDark;
                 ctx.lineWidth = 1;
@@ -1949,7 +1865,6 @@ class FlappyGame {
 
     drawRocket(t) {
         const ctx = this.ctx;
-        // 🔧 На мобильных меньше частиц пламени
         const trailCount = DeviceInfo.isLowEnd ? 5 : 10;
         for (let i = 0; i < trailCount; i++) {
             const a = Math.max(0, 0.8 - i * 0.1);
@@ -2034,7 +1949,6 @@ class FlappyGame {
 
     drawGoldBird(t) {
         const ctx = this.ctx;
-        // 🔧 На мобильных меньше бликов
         const sparkles = DeviceInfo.isLowEnd ? 6 : 12;
         for (let i = 0; i < sparkles; i++) {
             const a = t * 2 + (i * Math.PI / 6);

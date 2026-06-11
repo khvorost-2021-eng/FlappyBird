@@ -42,5 +42,4 @@ const LANG = {
         }
     }
 };
-
 const T = LANG.ru;
