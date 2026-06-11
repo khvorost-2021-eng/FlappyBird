@@ -500,7 +500,10 @@ class FlappyGame {
     this.lastTime = null;
     this.gameTime = 0;
 
-    this.bird = { x: 80, y: 300, velocity: 0, radius: 15 };
+    // ✅ ИСПРАВЛЕНИЕ: Сдвиг птицы правее на мобильных, чтобы крупные скины не обрезались слева
+    const birdX = DeviceInfo.isMobile ? 90 : 80;
+    this.bird = { x: birdX, y: 300, velocity: 0, radius: 15 };
+    
     this.pipes = [];
     this.coins = [];
     this.particles = [];
@@ -674,8 +677,6 @@ class FlappyGame {
     window.addEventListener('resize', () => this.handleResize());
 
     document.addEventListener('contextmenu', (e) => e.preventDefault());
-    
-    // ✅ ИСПРАВЛЕНИЕ: Разрешаем скролл в меню, блокируем только в игре и вне скроллируемых зон
     document.addEventListener('touchmove', (e) => {
       const target = e.target;
       const isScrollable = target.closest('#skinsGrid') || target.closest('.settings-container') || target.closest('#leaderboard');
@@ -683,7 +684,6 @@ class FlappyGame {
         e.preventDefault();
       }
     }, { passive: false });
-    
     document.addEventListener('gesturestart', (e) => e.preventDefault());
     document.addEventListener('gesturechange', (e) => e.preventDefault());
     document.addEventListener('gestureend', (e) => e.preventDefault());
@@ -746,7 +746,8 @@ class FlappyGame {
     if (gs && gs.classList.contains('active')) this.resizeCanvas();
   }
 
-  // ✅ ИСПРАВЛЕНИЕ: Используем getBoundingClientRect для точного размера на мобильных
+  // ✅ ИСПРАВЛЕНИЕ: Используем getBoundingClientRect для точного размера canvas
+  // Это решает проблему полос сверху/снизу на мобильных браузерах из-за плавающей адресной строки
   resizeCanvas() {
     if (!this.canvas) return;
     const rect = this.canvas.getBoundingClientRect();
@@ -756,6 +757,8 @@ class FlappyGame {
     const dpr = Math.min(window.devicePixelRatio || 1, DeviceInfo.isLowEnd ? 1.5 : 2);
     this.canvas.width = this.displayWidth * dpr;
     this.canvas.height = this.displayHeight * dpr;
+    
+    // Синхронизируем CSS размеры, чтобы избежать рассинхронизации
     this.canvas.style.width = this.displayWidth + 'px';
     this.canvas.style.height = this.displayHeight + 'px';
 
@@ -1108,7 +1111,9 @@ class FlappyGame {
   }
 
   resetGame() {
-    this.bird = { x: 80, y: 300, velocity: 0, radius: 15 };
+    // ✅ ИСПРАВЛЕНИЕ: Сдвиг птицы правее на мобильных, чтобы крупные скины не обрезались слева
+    const birdX = DeviceInfo.isMobile ? 90 : 80;
+    this.bird = { x: birdX, y: 300, velocity: 0, radius: 15 };
     this.pipes = [];
     this.coins = [];
     this.particles = [];
@@ -1245,7 +1250,7 @@ class FlappyGame {
     }
   }
 
-  // ✅ ИСПРАВЛЕНИЕ: min = 0 гарантирует отсутствие "потолка" на мобильных
+  // ✅ ИСПРАВЛЕНИЕ: Разная генерация для ПК и мобилки
   addPipe() {
     const theme = THEMES[gameState.theme] || THEMES.day;
     const groundHeight = theme.hasTrees ? 15 : 10;
@@ -1253,14 +1258,17 @@ class FlappyGame {
     let min, max;
     
     if (DeviceInfo.isMobile) {
-      min = 0; // Верхняя труба начинается строго с верхнего края
-      max = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - 60; // Оставляем место для земли
+      // 📱 МОБИЛЬНЫЙ: min = -30 гарантирует, что верхняя труба уходит за край экрана (нет "потолка")
+      min = -30;  
+      // Оставляем минимум 80px над землёй для нижней трубы
+      max = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - 80;  
     } else {
+      // 💻 ПК: обе трубы всегда видны
       min = 50;
       max = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - 50;
     }
     
-    const top = Math.max(0, Math.random() * (max - min) + min);
+    const top = Math.random() * (max - min) + min;
     this.pipes.push({
       x: this.visibleRight + 50,
       topHeight: top,
@@ -1484,7 +1492,7 @@ class FlappyGame {
     }
   }
 
-  // ✅ ИСПРАВЛЕНИЕ: Увеличена высота земли для мобильных (200 вместо 150)
+  // ✅ ИСПРАВЛЕНИЕ: Увеличена высота земли для мобильных (150 вместо 15), чтобы гарантированно перекрывать низ экрана
   drawGround(theme) {
     const ctx = this.ctx;
     
@@ -1495,7 +1503,7 @@ class FlappyGame {
       
       if (theme.hasTrees) {
         ctx.fillStyle = theme.ground;
-        ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 15, totalW, 200); // Увеличено до 200
+        ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 15, totalW, 150); // Увеличено до 150
         ctx.fillStyle = '#388E3C';
         const count = Math.ceil(totalW / 10);
         const grassOffset = this.gameStarted ? this.pipeSpeed * this.gameTime : 0;
@@ -1505,7 +1513,7 @@ class FlappyGame {
         }
       } else {
         ctx.fillStyle = theme.ground;
-        ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 10, totalW, 200); // Увеличено до 200
+        ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 10, totalW, 150); // Увеличено до 150
       }
     } else {
       const startX = this.visibleLeft - 20;
@@ -1527,7 +1535,7 @@ class FlappyGame {
     }
   }
 
-  // ✅ ИСПРАВЛЕНИЕ: Трубы на мобильных рисуются с запасом вверх (-400)
+  // ✅ ИСПРАВЛЕНИЕ: Трубы на мобильных рисуются с запасом вверх (-400), чтобы не было видно стыка с фоном
   drawPipe(pipe, theme) {
     const ctx = this.ctx;
     if (theme.hasTrees) {
@@ -1546,7 +1554,7 @@ class FlappyGame {
     ctx.fillStyle = g;
     
     if (DeviceInfo.isMobile) {
-      ctx.fillRect(pipe.x, -400, this.pipeWidth, pipe.topHeight + 400);
+      ctx.fillRect(pipe.x, -400, this.pipeWidth, pipe.topHeight + 400); // Уходит далеко за верхний край
     } else {
       ctx.fillRect(pipe.x, -100, this.pipeWidth, pipe.topHeight + 100);
     }
@@ -1687,6 +1695,14 @@ class FlappyGame {
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(this.bird.x, this.bird.y);
+    
+    // ✅ ИСПРАВЛЕНИЕ: Масштабирование крупных скинов на мобильных устройствах
+    // чтобы они не обрезались краями экрана
+    const largeSkins = ['dragon', 'rocket', 'plane'];
+    if (DeviceInfo.isMobile && largeSkins.includes(gameState.currentSkin)) {
+      ctx.scale(0.85, 0.85); // Уменьшаем на 15%
+    }
+
     let angle = 0;
     if (this.gameStarted) {
       angle = Math.max(-0.5, Math.min(0.8, this.bird.velocity / 600));

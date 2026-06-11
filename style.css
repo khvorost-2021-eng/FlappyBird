@@ -13,7 +13,7 @@ CSS-ПЕРЕМЕННЫЕ ДЛЯ ТЕМ
 html, body {
   margin: 0; padding: 0; overflow: hidden;
   width: 100%; 
-  height: 100dvh; /* Динамическая высота для мобильных браузеров */
+  height: 100dvh; /* ✅ ИСПРАВЛЕНИЕ: Динамическая высота для мобильных браузеров */
   height: 100%;   /* Фолбэк для старых браузеров */
   position: fixed; top: 0; left: 0;
   touch-action: none;
@@ -70,9 +70,9 @@ body {
 .game-screen {
   max-width: none;
   width: 100%;
-  height: 100%; /* Используем 100% от фиксированного body */
+  height: 100%; /* ✅ ИСПРАВЛЕНИЕ: Занимает всю высоту родителя */
   padding: 0;
-  position: absolute; /* Изменено с fixed для корректного позиционирования */
+  position: absolute; /* ✅ ИСПРАВЛЕНИЕ: Изменено с fixed для корректного позиционирования */
   top: 0; left: 0;
   z-index: 100;
   display: flex;
@@ -245,8 +245,6 @@ body {
   background: rgba(255, 255, 255, 0.3);
   border-radius: 20px;
   backdrop-filter: blur(10px);
-  
-  /* ✅ ИСПРАВЛЕНИЕ: Включаем сенсорный скролл */
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-y !important;
@@ -305,7 +303,8 @@ body {
 ИГРОВОЙ ЭКРАН
 ========================================== */
 #gameCanvas {
-  width: 100%; height: 100%;
+  width: 100%; 
+  height: 100%; /* ✅ ИСПРАВЛЕНИЕ: Гарантированное заполнение */
   display: block;
   touch-action: none;
 }
@@ -393,8 +392,6 @@ body {
   max-width: 500px;
   max-height: 65vh;
   overflow-y: auto;
-  
-  /* ✅ ИСПРАВЛЕНИЕ: Включаем сенсорный скролл */
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-y !important;
@@ -449,8 +446,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  
-  /* ✅ ИСПРАВЛЕНИЕ: Включаем сенсорный скролл */
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-y !important;
@@ -682,7 +677,6 @@ body {
   border: 2px solid transparent;
 }
 
-/* Для Firefox */
 * {
   scrollbar-width: thin;
   scrollbar-color: #FFD700 rgba(0, 0, 0, 0.1);
