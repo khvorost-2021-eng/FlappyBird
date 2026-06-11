@@ -444,7 +444,7 @@ const ScreenManager = {
             game.renderSkinsGrid();
         }
 
-        // ✅ ИСПРАВЛЕНИЕ БАГА 3: Рендерим темы СРАЗУ, без задержки
+        // ✅ ИСПРАВЛЕНИЕ: Рендер тем СРАЗУ, без задержки
         if (targetId === 'settingsScreen' && game) {
             game.renderSettingsScreen();
         }
@@ -468,7 +468,6 @@ const ScreenManager = {
                 this.currentScreen = targetId;
                 this.isTransitioning = false;
 
-                // ✅ УБРАЛИ renderSettingsScreen отсюда (было через 280ms)
                 if (targetId === 'menuScreen' && game) {
                     applyThemeToApp();
                     game.updateUIFromState();
@@ -866,10 +865,12 @@ class FlappyGame {
         const theme = THEMES[themeKey];
         let frame = 0;
         const render = () => {
+            // ✅ ИСПРАВЛЕНИЕ: проверяем наличие canvas в DOM, а не активность экрана
             if (!document.body.contains(canvas)) {
                 this.themePreviewAnimIds.delete(canvas);
                 return;
             }
+            
             const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
             g.addColorStop(0, theme.skyTop); g.addColorStop(1, theme.skyBottom);
             ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -912,7 +913,7 @@ class FlappyGame {
         requestAnimationFrame(render);
     }
 
-    // ✅ ИСПРАВЛЕНИЕ БАГА 2: Плавное переключение тем без пересоздания карточек
+    // ✅ ИСПРАВЛЕНИЕ: Плавное переключение тем без пересоздания карточек
     async selectTheme(k) {
         if (!THEMES[k]) return;
         gameState.theme = k;
@@ -1258,7 +1259,7 @@ class FlappyGame {
         }
     }
 
-    // ✅ ИСПРАВЛЕНИЕ БАГА 1: Гарантируем корректную генерацию труб
+    // ✅ ИСПРАВЛЕНИЕ: Разная генерация для ПК и мобилки
     addPipe() {
         const theme = THEMES[gameState.theme] || THEMES.day;
         const groundHeight = theme.hasTrees ? 15 : 10;
@@ -1266,11 +1267,11 @@ class FlappyGame {
         let min, max;
         
         if (DeviceInfo.isMobile) {
-            // 📱 МОБИЛЬНЫЙ: верхняя труба уходит за край, но её нижний край всегда виден
-            min = 10;  // Минимум 10px верхней трубы видно (труба рисуется от -100 до 10)
+            // 📱 МОБИЛЬНЫЙ: верхняя труба уходит за край, нижняя не слишком низко
+            min = -30;  // Верхняя труба уходит за край на 30px
             max = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - 80;  // Нижняя труба минимум 80px над землёй
         } else {
-            // 💻 ПК: обе трубы всегда хорошо видны
+            // 💻 ПК: обе трубы всегда видны
             min = 50;
             max = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - 50;
         }
@@ -1499,26 +1500,52 @@ class FlappyGame {
         }
     }
 
+    // ✅ ИСПРАВЛЕНИЕ: Разная отрисовка для ПК и мобилки
     drawGround(theme) {
         const ctx = this.ctx;
-        const startX = this.visibleLeft - 20;
-        const totalW = this.visibleWidth + 40;
-        if (theme.hasTrees) {
-            ctx.fillStyle = theme.ground;
-            ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 15, totalW, 15);
-            ctx.fillStyle = '#388E3C';
-            const count = Math.ceil(totalW / 10);
-            const grassOffset = this.gameStarted ? this.pipeSpeed * this.gameTime : 0;
-            for (let i = 0; i < count; i++) {
-                const gx = startX + ((i * 15 + Math.floor(grassOffset)) % totalW + totalW) % totalW;
-                ctx.fillRect(gx, this.VIRTUAL_HEIGHT - 18, 2, 6);
+        
+        if (DeviceInfo.isMobile) {
+            // 📱 МОБИЛЬНЫЙ: земля на всю ширину canvas и продлевается вниз
+            const canvasWidthInVirtual = this.displayWidth / this.scale;
+            const startX = -100;
+            const totalW = canvasWidthInVirtual + 200;
+            
+            if (theme.hasTrees) {
+                ctx.fillStyle = theme.ground;
+                ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 15, totalW, 150);
+                ctx.fillStyle = '#388E3C';
+                const count = Math.ceil(totalW / 10);
+                const grassOffset = this.gameStarted ? this.pipeSpeed * this.gameTime : 0;
+                for (let i = 0; i < count; i++) {
+                    const gx = startX + ((i * 15 + Math.floor(grassOffset)) % totalW + totalW) % totalW;
+                    ctx.fillRect(gx, this.VIRTUAL_HEIGHT - 18, 2, 6);
+                }
+            } else {
+                ctx.fillStyle = theme.ground;
+                ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 10, totalW, 150);
             }
         } else {
-            ctx.fillStyle = theme.ground;
-            ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 10, totalW, 10);
+            // 💻 ПК: текущая логика
+            const startX = this.visibleLeft - 20;
+            const totalW = this.visibleWidth + 40;
+            if (theme.hasTrees) {
+                ctx.fillStyle = theme.ground;
+                ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 15, totalW, 15);
+                ctx.fillStyle = '#388E3C';
+                const count = Math.ceil(totalW / 10);
+                const grassOffset = this.gameStarted ? this.pipeSpeed * this.gameTime : 0;
+                for (let i = 0; i < count; i++) {
+                    const gx = startX + ((i * 15 + Math.floor(grassOffset)) % totalW + totalW) % totalW;
+                    ctx.fillRect(gx, this.VIRTUAL_HEIGHT - 18, 2, 6);
+                }
+            } else {
+                ctx.fillStyle = theme.ground;
+                ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 10, totalW, 10);
+            }
         }
     }
 
+    // ✅ ИСПРАВЛЕНИЕ: Разная отрисовка для ПК и мобилки
     drawPipe(pipe, theme) {
         const ctx = this.ctx;
         if (theme.hasTrees) {
@@ -1535,7 +1562,15 @@ class FlappyGame {
             return grad;
         });
         ctx.fillStyle = g;
-        ctx.fillRect(pipe.x, -100, this.pipeWidth, pipe.topHeight + 100);
+        
+        if (DeviceInfo.isMobile) {
+            // 📱 МОБИЛЬНЫЙ: трубы уходят далеко за верхний край
+            ctx.fillRect(pipe.x, -400, this.pipeWidth, pipe.topHeight + 400);
+        } else {
+            // 💻 ПК: текущая логика
+            ctx.fillRect(pipe.x, -100, this.pipeWidth, pipe.topHeight + 100);
+        }
+        
         ctx.fillRect(pipe.x, pipe.bottomY, this.pipeWidth, this.VIRTUAL_HEIGHT - pipe.bottomY);
         ctx.strokeStyle = theme.pipeDark;
         ctx.lineWidth = 2;
