@@ -78,11 +78,7 @@ applyThemeToApp();
 // ==========================================
 const DeviceInfo = {
   isMobile: (function() {
-    return (
-      ('ontouchstart' in window) ||
-      (navigator.maxTouchPoints > 0) ||
-      (window.innerWidth <= 1024)
-    );
+    return (('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 1024));
   })(),
   isDesktop: (function() {
     return !(('ontouchstart' in window) || (navigator.maxTouchPoints > 0)) && window.innerWidth > 1024;
@@ -270,10 +266,7 @@ const SoundManager = {
         }
       } catch (e) {}
       noteIndex = (noteIndex + 1) % melody.length;
-      this.musicTimeout = setTimeout(
-        playNextNote,
-        melody[(noteIndex - 1 + melody.length) % melody.length].dur * 1000
-      );
+      this.musicTimeout = setTimeout(playNextNote, melody[(noteIndex - 1 + melody.length) % melody.length].dur * 1000);
     };
     playNextNote();
   },
@@ -421,18 +414,9 @@ const ScreenManager = {
     SoundManager.playUIClick();
 
     if (targetId === 'menuScreen') applyThemeToApp();
-
-    if (targetId === 'skinsScreen' && game) {
-      game.renderSkinsGrid();
-    }
-
-    if (targetId === 'settingsScreen' && game) {
-      game.renderSettingsScreen();
-    }
-
-    if (targetId === 'menuScreen' && game) {
-      game.updateMenuPreview();
-    }
+    if (targetId === 'skinsScreen' && game) game.renderSkinsGrid();
+    if (targetId === 'settingsScreen' && game) game.renderSettingsScreen();
+    if (targetId === 'menuScreen' && game) game.updateMenuPreview();
 
     fromEl.classList.remove('active');
 
@@ -442,13 +426,10 @@ const ScreenManager = {
         game.resetGame();
         try { game.render(); } catch (e) {}
       }
-
       toEl.classList.add('active');
-
       setTimeout(() => {
         this.currentScreen = targetId;
         this.isTransitioning = false;
-
         if (targetId === 'menuScreen' && game) {
           applyThemeToApp();
           game.updateUIFromState();
@@ -459,7 +440,7 @@ const ScreenManager = {
 };
 
 // ==========================================
-// ИГРА (ОПТИМИЗИРОВАННАЯ)
+// ИГРА
 // ==========================================
 class FlappyGame {
   constructor() {
@@ -500,8 +481,8 @@ class FlappyGame {
     this.lastTime = null;
     this.gameTime = 0;
 
-    // ✅ ИСПРАВЛЕНИЕ: Сдвиг птицы правее на мобильных, чтобы крупные скины не обрезались слева
-    const birdX = DeviceInfo.isMobile ? 90 : 80;
+    // ✅ ИСПРАВЛЕНИЕ: Сдвиг птицы правее на мобильных, чтобы хвост крупных скинов не обрезался
+    const birdX = DeviceInfo.isMobile ? 100 : 80;
     this.bird = { x: birdX, y: 300, velocity: 0, radius: 15 };
     
     this.pipes = [];
@@ -550,9 +531,10 @@ class FlappyGame {
     this.gradientCache.clear();
   }
 
+  // ✅ ОПТИМИЗАЦИЯ: Меньше облаков на телефоне
   generateClouds() {
     this.clouds = [];
-    const count = DeviceInfo.isLowEnd ? 5 : 8;
+    const count = DeviceInfo.isMobile ? 3 : (DeviceInfo.isLowEnd ? 5 : 8);
     for (let i = 0; i < count; i++) {
       this.clouds.push({
         baseX: i * 150 + Math.random() * 50,
@@ -563,9 +545,10 @@ class FlappyGame {
     }
   }
 
+  // ✅ ОПТИМИЗАЦИЯ: Меньше звёзд на телефоне
   generateStars() {
     this.stars = [];
-    const count = DeviceInfo.isLowEnd ? 50 : 150;
+    const count = DeviceInfo.isMobile ? 30 : (DeviceInfo.isLowEnd ? 50 : 150);
     for (let i = 0; i < count; i++) {
       this.stars.push({
         x: Math.random() * this.displayWidth,
@@ -675,8 +658,9 @@ class FlappyGame {
     }
 
     window.addEventListener('resize', () => this.handleResize());
-
     document.addEventListener('contextmenu', (e) => e.preventDefault());
+    
+    // ✅ ИСПРАВЛЕНИЕ: Разрешаем скролл в меню, блокируем только в игре
     document.addEventListener('touchmove', (e) => {
       const target = e.target;
       const isScrollable = target.closest('#skinsGrid') || target.closest('.settings-container') || target.closest('#leaderboard');
@@ -684,6 +668,7 @@ class FlappyGame {
         e.preventDefault();
       }
     }, { passive: false });
+    
     document.addEventListener('gesturestart', (e) => e.preventDefault());
     document.addEventListener('gesturechange', (e) => e.preventDefault());
     document.addEventListener('gestureend', (e) => e.preventDefault());
@@ -746,16 +731,11 @@ class FlappyGame {
     if (gs && gs.classList.contains('active')) this.resizeCanvas();
   }
 
-  // ✅ ИСПРАВЛЕНИЕ: Используем getBoundingClientRect для точного размера canvas
-  // Это решает проблему полос сверху/снизу на мобильных браузерах из-за плавающей адресной строки
-
+  // ✅ ОПТИМИЗАЦИЯ: Ограничение DPR до 1.5 на мобильных для предотвращения перегрева и лагов
   resizeCanvas() {
-    const dpr = Math.min(window.devicePixelRatio || 1, DeviceInfo.isLowEnd ? 1.5 : 2);
-    
-    // ✅ ИСПРАВЛЕНИЕ: Используем visualViewport для точного размера на мобильных
-    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, DeviceInfo.isMobile ? 1.5 : 2);
     this.displayWidth = window.innerWidth;
-    this.displayHeight = vh;
+    this.displayHeight = window.innerHeight;
     
     this.canvas.width = this.displayWidth * dpr;
     this.canvas.height = this.displayHeight * dpr;
@@ -861,7 +841,6 @@ class FlappyGame {
         this.themePreviewAnimIds.delete(canvas);
         return;
       }
-      
       const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
       g.addColorStop(0, theme.skyTop); g.addColorStop(1, theme.skyBottom);
       ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -910,7 +889,6 @@ class FlappyGame {
     applyThemeToApp();
     this.updateMenuPreview();
     await YandexAPI.savePlayerData(gameState);
-
     const cards = document.querySelectorAll('.theme-card');
     const keys = Object.keys(THEMES);
     cards.forEach((card, i) => {
@@ -921,11 +899,8 @@ class FlappyGame {
   startMenuPreview() {
     applyThemeToApp();
     if (!this.menuCanvas || !this.menuCtx) return;
-
     const currentTheme = gameState.theme + '_' + gameState.currentSkin;
-    if (this.menuAnimId && this._menuPreviewKey === currentTheme) {
-      return;
-    }
+    if (this.menuAnimId && this._menuPreviewKey === currentTheme) return;
     this._menuPreviewKey = currentTheme;
 
     if (this.menuAnimId) {
@@ -1111,7 +1086,7 @@ class FlappyGame {
   }
 
   resetGame() {
-    // ✅ ИСПРАВЛЕНИЕ: Сдвиг птицы правее на мобильных, чтобы крупные скины не обрезались слева
+    // ✅ ИСПРАВЛЕНИЕ: Сдвиг птицы правее на мобильных
     const birdX = DeviceInfo.isMobile ? 100 : 80;
     this.bird = { x: birdX, y: 300, velocity: 0, radius: 15 };
     this.pipes = [];
@@ -1137,49 +1112,36 @@ class FlappyGame {
 
   gameLoop() {
     if (!this.gameRunning) return;
-
     const now = performance.now();
-
     if (this.lastTime === null) {
       this.lastTime = now;
       try { this.render(); } catch (e) {}
       this.animationId = requestAnimationFrame(() => this.gameLoop());
       return;
     }
-
     let dt = (now - this.lastTime) / 1000;
     this.lastTime = now;
-
     if (dt > 0.1) dt = 0.1;
     if (dt <= 0) dt = 1/60;
-
     this.accumulator += dt;
-
     let updates = 0;
     while (this.accumulator >= this.FIXED_DT && updates < 5) {
       this.update(this.FIXED_DT);
       this.accumulator -= this.FIXED_DT;
       updates++;
     }
-
     if (this.accumulator > this.FIXED_DT * 5) this.accumulator = 0;
-
-    try { this.render(); } catch (err) {
-      console.error('Render error:', err);
-    }
-
+    try { this.render(); } catch (err) { console.error('Render error:', err); }
     this.animationId = requestAnimationFrame(() => this.gameLoop());
   }
 
   update(dt) {
     this.frameCount++;
     this.gameTime += dt;
-
     if (!this.gameStarted) {
       this.bird.y = 300 + Math.sin(this.gameTime * 3) * 20;
       return;
     }
-
     this.bird.velocity += this.gravity * dt;
     if (this.bird.velocity > this.terminalVelocity) {
       this.bird.velocity = this.terminalVelocity;
@@ -1199,18 +1161,15 @@ class FlappyGame {
     for (let i = this.pipes.length - 1; i >= 0; i--) {
       const pipe = this.pipes[i];
       pipe.x -= this.pipeSpeed * dt;
-
       if (this.checkCollision(pipe)) {
         this.gameOver();
         return;
       }
-
       if (!pipe.passed && pipe.x + this.pipeWidth < this.bird.x) {
         pipe.passed = true;
         this.score++;
         document.getElementById('score').textContent = this.score;
       }
-
       if (pipe.x + this.pipeWidth < this.visibleLeft - 50) {
         this.pipes.splice(i, 1);
       }
@@ -1244,26 +1203,21 @@ class FlappyGame {
       if (p.life <= 0) this.particles.splice(i, 1);
     }
 
-    if (this.bird.y + this.bird.radius > this.VIRTUAL_HEIGHT ||
-        this.bird.y - this.bird.radius < 0) {
+    if (this.bird.y + this.bird.radius > this.VIRTUAL_HEIGHT || this.bird.y - this.bird.radius < 0) {
       this.gameOver();
     }
   }
 
-  // ✅ ИСПРАВЛЕНИЕ: Разная генерация для ПК и мобилки
+  // ✅ ИСПРАВЛЕНИЕ: Генерация труб на телефоне теперь гарантирует их видимость (min = 50)
   addPipe() {
     const theme = THEMES[gameState.theme] || THEMES.day;
     const groundHeight = theme.hasTrees ? 15 : 10;
-    
     let min, max;
     
     if (DeviceInfo.isMobile) {
-      // 📱 МОБИЛЬНЫЙ: min = -30 гарантирует, что верхняя труба уходит за край экрана (нет "потолка")
-      min = -50;  
-      // Оставляем минимум 80px над землёй для нижней трубы
-      max = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - 50;  
+      min = 50; // Гарантирует, что верхняя труба ВСЕГДА видна (отступ 50px от верха)
+      max = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - 50;
     } else {
-      // 💻 ПК: обе трубы всегда видны
       min = 50;
       max = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - 50;
     }
@@ -1288,8 +1242,9 @@ class FlappyGame {
     }
   }
 
+  // ✅ ОПТИМИЗАЦИЯ: Меньше частиц на телефоне для экономии CPU/GPU
   addParticles(x, y, color) {
-    const count = DeviceInfo.isLowEnd ? 6 : 12;
+    const count = DeviceInfo.isMobile ? 4 : 12;
     for (let i = 0; i < count; i++) {
       this.particles.push({
         x, y,
@@ -1492,18 +1447,15 @@ class FlappyGame {
     }
   }
 
-  // ✅ ИСПРАВЛЕНИЕ: Увеличена высота земли для мобильных (150 вместо 15), чтобы гарантированно перекрывать низ экрана
   drawGround(theme) {
     const ctx = this.ctx;
-    
     if (DeviceInfo.isMobile) {
       const canvasWidthInVirtual = this.displayWidth / this.scale;
       const startX = -100;
       const totalW = canvasWidthInVirtual + 200;
-      
       if (theme.hasTrees) {
         ctx.fillStyle = theme.ground;
-        ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 15, totalW, 150); // Увеличено до 150
+        ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 15, totalW, 150); // Увеличено для гарантии закрытия низа
         ctx.fillStyle = '#388E3C';
         const count = Math.ceil(totalW / 10);
         const grassOffset = this.gameStarted ? this.pipeSpeed * this.gameTime : 0;
@@ -1513,7 +1465,7 @@ class FlappyGame {
         }
       } else {
         ctx.fillStyle = theme.ground;
-        ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 10, totalW, 150); // Увеличено до 150
+        ctx.fillRect(startX, this.VIRTUAL_HEIGHT - 10, totalW, 150); // Увеличено для гарантии закрытия низа
       }
     } else {
       const startX = this.visibleLeft - 20;
@@ -1535,7 +1487,6 @@ class FlappyGame {
     }
   }
 
-  // ✅ ИСПРАВЛЕНИЕ: Трубы на мобильных рисуются с запасом вверх (-400), чтобы не было видно стыка с фоном
   drawPipe(pipe, theme) {
     const ctx = this.ctx;
     if (theme.hasTrees) {
@@ -1600,11 +1551,7 @@ class FlappyGame {
           const iy = y + i * 25;
           ctx.beginPath();
           ctx.moveTo(x, iy);
-          ctx.bezierCurveTo(
-            x + this.pipeWidth * 0.3, iy + 3,
-            x + this.pipeWidth * 0.7, iy - 3,
-            x + this.pipeWidth, iy
-          );
+          ctx.bezierCurveTo(x + this.pipeWidth * 0.3, iy + 3, x + this.pipeWidth * 0.7, iy - 3, x + this.pipeWidth, iy);
           ctx.stroke();
         }
         ctx.globalAlpha = 1;
@@ -1691,21 +1638,20 @@ class FlappyGame {
     ctx.restore();
   }
 
-
   drawBird() {
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(this.bird.x, this.bird.y);
     
-    // ✅ ИСПРАВЛЕНИЕ: Уменьшаем крупные скины пропорционально только на мобильных
+    // ✅ ИСПРАВЛЕНИЕ: Масштабирование крупных скинов на мобильных устройствах
     const largeSkins = ['dragon', 'rocket', 'plane'];
     if (DeviceInfo.isMobile && largeSkins.includes(gameState.currentSkin)) {
-        ctx.scale(0.75, 0.75); 
+      ctx.scale(0.75, 0.75); // Уменьшаем на 25%, чтобы помещались в экран
     }
 
     let angle = 0;
     if (this.gameStarted) {
-        angle = Math.max(-0.5, Math.min(0.8, this.bird.velocity / 600));
+      angle = Math.max(-0.5, Math.min(0.8, this.bird.velocity / 600));
     }
     ctx.rotate(angle);
     try { this.drawSkin(this.gameTime * 3, gameState.currentSkin); }
