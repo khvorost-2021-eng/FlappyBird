@@ -65,9 +65,6 @@ const settings = {
     if (savedSettings) { try { Object.assign(settings, JSON.parse(savedSettings)); } catch (e) {} }
 })();
 
-// ==========================================
-// ПРИМЕНИТЬ ТЕМУ КО ВСЕМУ ПРИЛОЖЕНИЮ
-// ==========================================
 function applyThemeToApp() {
     const theme = THEMES[gameState.theme] || THEMES.day;
     document.body.style.setProperty('--sky-top', theme.appBgTop);
@@ -78,12 +75,29 @@ function applyThemeToApp() {
 applyThemeToApp();
 
 // ==========================================
+// ОПРЕДЕЛЕНИЕ МОБИЛЬНОГО УСТРОЙСТВА
+// ==========================================
+const DeviceInfo = {
+    isMobile: (function() {
+        return (
+            ('ontouchstart' in window) ||
+            (navigator.maxTouchPoints > 0) ||
+            (window.innerWidth <= 1024)
+        );
+    })(),
+    isLowEnd: (function() {
+        // Простая эвристика: мобильные устройства считаем low-end
+        return window.innerWidth <= 1024 || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2);
+    })()
+};
+
+// ==========================================
 // ЗВУК
 // ==========================================
 const SoundManager = {
     audioCtx: null, musicGain: null, sfxGain: null,
     musicPlaying: false, musicTimeout: null,
-    
+
     init() {
         try {
             this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -94,19 +108,19 @@ const SoundManager = {
             this.updateVolumes();
         } catch (e) {}
     },
-    
+
     resume() {
         if (this.audioCtx && this.audioCtx.state === 'suspended') {
             this.audioCtx.resume();
         }
     },
-    
+
     updateVolumes() {
         if (!this.audioCtx) return;
         this.musicGain.gain.value = settings.musicMuted ? 0 : settings.musicVolume * 0.3;
         this.sfxGain.gain.value = settings.sfxMuted ? 0 : settings.sfxVolume;
     },
-    
+
     playFlap() {
         if (!this.audioCtx || settings.sfxMuted) return;
         this.resume();
@@ -125,7 +139,7 @@ const SoundManager = {
             osc.stop(now + 0.1);
         } catch (e) {}
     },
-    
+
     playCoin() {
         if (!this.audioCtx || settings.sfxMuted) return;
         this.resume();
@@ -147,7 +161,7 @@ const SoundManager = {
             });
         } catch (e) {}
     },
-    
+
     playCrash() {
         if (!this.audioCtx || settings.sfxMuted) return;
         this.resume();
@@ -182,7 +196,7 @@ const SoundManager = {
             osc.stop(now + 0.3);
         } catch (e) {}
     },
-    
+
     playUIClick() {
         if (!this.audioCtx || settings.sfxMuted) return;
         this.resume();
@@ -201,7 +215,7 @@ const SoundManager = {
             osc.stop(now + 0.08);
         } catch (e) {}
     },
-    
+
     startMusic() {
         if (!this.audioCtx || settings.musicMuted || this.musicPlaying) return;
         this.resume();
@@ -254,7 +268,7 @@ const SoundManager = {
         };
         playNextNote();
     },
-    
+
     stopMusic() {
         this.musicPlaying = false;
         if (this.musicTimeout) {
@@ -279,7 +293,7 @@ const YandexAPI = {
             return true;
         } catch (err) { sdkReady = false; return false; }
     },
-    
+
     async _tryInit() {
         let a = 0;
         while (typeof YaGames === 'undefined' && a < 30) {
@@ -288,24 +302,14 @@ const YandexAPI = {
         }
         if (typeof YaGames === 'undefined') throw new Error('no sdk');
         ysdk = await YaGames.init();
-        
-        // Скрываем прелоадер Яндекс Игр
-        try {
-            if (ysdk.features && ysdk.features.LoadingAPI) {
-                ysdk.features.LoadingAPI.ready();
-            }
-        } catch (e) {}
-        
+        try { if (ysdk.features && ysdk.features.LoadingAPI) ysdk.features.LoadingAPI.ready(); } catch (e) {}
         try { yandexPlayer = await ysdk.getPlayer({ scopes: false }); } catch (e) {}
     },
-    
+
     async syncPlayerData() {
         if (!sdkReady || !yandexPlayer) return;
         try {
-            const data = await yandexPlayer.getData([
-                'coins', 'currentSkin', 'ownedSkins',
-                'bestScore', 'totalGames', 'theme'
-            ]);
+            const data = await yandexPlayer.getData(['coins','currentSkin','ownedSkins','bestScore','totalGames','theme']);
             const f = {
                 name: yandexPlayer.getName() || T.guest,
                 avatar: yandexPlayer.getPhoto('small'),
@@ -324,14 +328,11 @@ const YandexAPI = {
             if (sc) sc.textContent = gameState.coins;
             const av = document.getElementById('playerAvatar');
             const nm = document.getElementById('playerName');
-            if (gameState.avatar && av) {
-                av.src = gameState.avatar;
-                av.style.display = 'block';
-            }
+            if (gameState.avatar && av) { av.src = gameState.avatar; av.style.display = 'block'; }
             if (nm) nm.textContent = gameState.name;
         } catch (e) {}
     },
-    
+
     async savePlayerData(data) {
         try { localStorage.setItem('flappyPlayer', JSON.stringify(data)); } catch (e) {}
         if (!sdkReady || !yandexPlayer) return data;
@@ -344,7 +345,7 @@ const YandexAPI = {
         } catch (e) {}
         return data;
     },
-    
+
     async submitScore(score) {
         if (!sdkReady || !ysdk) return false;
         try {
@@ -353,15 +354,13 @@ const YandexAPI = {
             return true;
         } catch (e) { return false; }
     },
-    
+
     async getLeaderboard() {
         if (!sdkReady || !ysdk) return this.getStaticLeaderboard();
         try {
             const lb = await ysdk.getLeaderboards();
             const r = await lb.getLeaderboardEntries('flappycores', {
-                quantityTop: 10,
-                quantityAround: 2,
-                includeUser: true
+                quantityTop: 10, quantityAround: 2, includeUser: true
             });
             return r.entries.map(e => ({
                 rank: e.rank,
@@ -372,7 +371,7 @@ const YandexAPI = {
             }));
         } catch (e) { return this.getStaticLeaderboard(); }
     },
-    
+
     getStaticLeaderboard() {
         return [
             { rank: 1, name: "Александр", score: 87, uniqueId: 'a' },
@@ -423,27 +422,21 @@ const ScreenManager = {
 
         if (targetId === 'menuScreen') applyThemeToApp();
 
-        // Перед переходом в меню — обновляем превью ДО анимации
         if (targetId === 'menuScreen' && game) {
             game.updateMenuPreview();
         }
 
-        // ШАГ 1: Fade out
         fromEl.classList.remove('active');
 
-        // ШАГ 2: Ждём исчезновения
         setTimeout(() => {
-            // Перед показом gameScreen — очищаем canvas
             if (targetId === 'gameScreen' && game) {
                 game.resizeCanvas();
                 game.resetGame();
                 try { game.render(); } catch (e) {}
             }
 
-            // ШАГ 3: Fade in
             toEl.classList.add('active');
 
-            // ШАГ 4: Колбэки
             setTimeout(() => {
                 this.currentScreen = targetId;
                 this.isTransitioning = false;
@@ -463,14 +456,14 @@ const ScreenManager = {
 };
 
 // ==========================================
-// ИГРА
+// ИГРА (ОПТИМИЗИРОВАННАЯ)
 // ==========================================
 class FlappyGame {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
-        this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
+        this.ctx = this.canvas ? this.canvas.getContext('2d', { alpha: false }) : null;
         this.menuCanvas = document.getElementById('menuCanvas');
-        this.menuCtx = this.menuCanvas ? this.menuCanvas.getContext('2d') : null;
+        this.menuCtx = this.menuCanvas ? this.menuCanvas.getContext('2d', { alpha: false }) : null;
 
         this.VIRTUAL_WIDTH = 400;
         this.VIRTUAL_HEIGHT = 600;
@@ -483,16 +476,14 @@ class FlappyGame {
         this.displayWidth = 400;
         this.displayHeight = 600;
 
-        // ==========================================
-        // ФИЗИКА (px/s, независима от FPS)
-        // ==========================================
-        this.gravity = 2000;          // px/s²
-        this.jumpStrength = -600;     // px/s
-        this.terminalVelocity = 800;  // px/s
-        this.pipeGap = 165;           // px
-        this.pipeWidth = 60;          // px
-        this.pipeSpeed = 350;         // px/s
-        this.pipeInterval = 0.76;     // секунд между трубами
+        // Физика
+        this.gravity = 2000;
+        this.jumpStrength = -600;
+        this.terminalVelocity = 800;
+        this.pipeGap = 165;
+        this.pipeWidth = 60;
+        this.pipeSpeed = 350;
+        this.pipeInterval = 0.76;
         this.pipeTimer = 0;
 
         this.FIXED_DT = 1 / 60;
@@ -522,6 +513,10 @@ class FlappyGame {
         this._wasStarted = false;
         this._pausedState = null;
 
+        // 🔧 КЭШ ГРАДИЕНТОВ — создаются один раз, переиспользуются
+        this.gradientCache = new Map();
+        this.lastThemeKey = null;
+
         this.generateClouds();
         this.bindEvents();
         this.updateUIFromState();
@@ -548,13 +543,28 @@ class FlappyGame {
         this.tryLockOrientation();
     }
 
+    // 🔧 ОПТИМИЗАЦИЯ: кэшированный градиент
+    getCachedGradient(key, creator) {
+        if (!this.gradientCache.has(key)) {
+            this.gradientCache.set(key, creator());
+        }
+        return this.gradientCache.get(key);
+    }
+
+    // 🔧 ОПТИМИЗАЦИЯ: очистить кэш при смене темы/размера
+    invalidateGradientCache() {
+        this.gradientCache.clear();
+    }
+
     generateClouds() {
         this.clouds = [];
-        for (let i = 0; i < 8; i++) {
+        // 🔧 На мобильных меньше облаков
+        const count = DeviceInfo.isLowEnd ? 5 : 8;
+        for (let i = 0; i < count; i++) {
             this.clouds.push({
                 baseX: i * 150 + Math.random() * 50,
                 y: 30 + i * 70 + Math.random() * 30,
-                speed: 18 + Math.random() * 12, // px/s
+                speed: 18 + Math.random() * 12,
                 scale: 0.7 + Math.random() * 0.5
             });
         }
@@ -562,7 +572,9 @@ class FlappyGame {
 
     generateStars() {
         this.stars = [];
-        for (let i = 0; i < 150; i++) {
+        // 🔧 На мобильных в 3 раза меньше звёзд
+        const count = DeviceInfo.isLowEnd ? 50 : 150;
+        for (let i = 0; i < count; i++) {
             this.stars.push({
                 x: Math.random() * this.displayWidth,
                 y: Math.random() * this.displayHeight * 0.85,
@@ -672,9 +684,6 @@ class FlappyGame {
 
         window.addEventListener('resize', () => this.handleResize());
 
-        // ==========================================
-        // БЛОКИРОВКИ ДЛЯ ЯНДЕКС ИГР
-        // ==========================================
         document.addEventListener('contextmenu', (e) => e.preventDefault());
         document.addEventListener('touchmove', (e) => {
             if (e.target === this.canvas || document.body.contains(e.target)) e.preventDefault();
@@ -683,13 +692,11 @@ class FlappyGame {
         document.addEventListener('gesturechange', (e) => e.preventDefault());
         document.addEventListener('gestureend', (e) => e.preventDefault());
 
-        // Пауза при сворачивании вкладки
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) this.handleVisibilityHidden();
             else this.handleVisibilityVisible();
         });
 
-        // Блокировка двойного тапа зума на iOS
         let lastTouchEnd = 0;
         document.addEventListener('touchend', (e) => {
             const now = Date.now();
@@ -745,7 +752,7 @@ class FlappyGame {
     }
 
     resizeCanvas() {
-        const dpr = window.devicePixelRatio || 1;
+        const dpr = Math.min(window.devicePixelRatio || 1, DeviceInfo.isLowEnd ? 1.5 : 2);
         this.displayWidth = window.innerWidth;
         this.displayHeight = window.innerHeight;
         this.canvas.width = this.displayWidth * dpr;
@@ -762,6 +769,7 @@ class FlappyGame {
         this.visibleWidth = this.visibleRight - this.visibleLeft;
 
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        this.invalidateGradientCache();
         this.generateStars();
     }
 
@@ -771,8 +779,7 @@ class FlappyGame {
 
         const isMobile = (
             ('ontouchstart' in window) ||
-            (navigator.maxTouchPoints > 0) ||
-            (navigator.msMaxTouchPoints > 0)
+            (navigator.maxTouchPoints > 0)
         ) && (window.innerWidth <= 1024 || window.innerHeight <= 1024);
 
         if (isMobile) {
@@ -811,17 +818,13 @@ class FlappyGame {
 
     pauseForRotation() {
         this.pausedForRotation = true;
-        const wasRunning = this.gameRunning;
-        const wasStarted = this.gameStarted;
-        this._pausedState = { wasRunning, wasStarted };
-
+        this._pausedState = { wasRunning: this.gameRunning, wasStarted: this.gameStarted };
         this.gameRunning = false;
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
             this.animationId = null;
         }
         SoundManager.stopMusic();
-
         if (SoundManager.audioCtx && SoundManager.audioCtx.state === 'running') {
             try { SoundManager.audioCtx.suspend(); } catch (e) {}
         }
@@ -836,11 +839,9 @@ class FlappyGame {
         }
 
         const state = this._pausedState || {};
-
         if (state.wasRunning) {
             this.gameRunning = true;
             this.lastTime = null;
-
             if (state.wasStarted) {
                 this.gameStarted = false;
                 const h = document.getElementById('tapHint');
@@ -849,7 +850,6 @@ class FlappyGame {
                 if (b) b.classList.remove('game-hidden');
                 SoundManager.stopMusic();
             }
-
             this.gameLoop();
         }
         this._pausedState = null;
@@ -902,18 +902,8 @@ class FlappyGame {
         const ss = document.getElementById('sfxSlider');
         const mt = document.getElementById('musicToggle');
         const st = document.getElementById('sfxToggle');
-        if (ms) {
-            ms.value = settings.musicVolume * 100;
-            this.updateSliderProgress(ms);
-            document.getElementById('musicValue').textContent =
-                Math.round(settings.musicVolume * 100) + '%';
-        }
-        if (ss) {
-            ss.value = settings.sfxVolume * 100;
-            this.updateSliderProgress(ss);
-            document.getElementById('sfxValue').textContent =
-                Math.round(settings.sfxVolume * 100) + '%';
-        }
+        if (ms) { ms.value = settings.musicVolume * 100; this.updateSliderProgress(ms); document.getElementById('musicValue').textContent = Math.round(settings.musicVolume * 100) + '%'; }
+        if (ss) { ss.value = settings.sfxVolume * 100; this.updateSliderProgress(ss); document.getElementById('sfxValue').textContent = Math.round(settings.sfxVolume * 100) + '%'; }
         if (mt) this.updateMuteButton(mt, settings.musicMuted);
         if (st) this.updateMuteButton(st, settings.sfxMuted);
 
@@ -928,16 +918,13 @@ class FlappyGame {
             card.className = 'theme-card';
             if (k === gameState.theme) card.classList.add('selected');
             const cvs = document.createElement('canvas');
-            cvs.width = 200;
-            cvs.height = 160;
+            cvs.width = 200; cvs.height = 160;
             card.appendChild(cvs);
             const lbl = document.createElement('div');
-            lbl.className = 'theme-label';
-            lbl.textContent = theme.name;
+            lbl.className = 'theme-label'; lbl.textContent = theme.name;
             card.appendChild(lbl);
             const chk = document.createElement('div');
-            chk.className = 'theme-check';
-            chk.textContent = '✓';
+            chk.className = 'theme-check'; chk.textContent = '✓';
             card.appendChild(chk);
             card.addEventListener('click', () => this.selectTheme(k));
             grid.appendChild(card);
@@ -946,77 +933,48 @@ class FlappyGame {
     }
 
     startThemePreview(canvas, themeKey) {
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { alpha: false });
         const theme = THEMES[themeKey];
         let frame = 0;
         const render = () => {
             const ss = document.getElementById('settingsScreen');
-            if (!ss || !ss.classList.contains('active')) {
-                this.themePreviewAnimIds.delete(canvas);
-                return;
-            }
+            if (!ss || !ss.classList.contains('active')) { this.themePreviewAnimIds.delete(canvas); return; }
             const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            g.addColorStop(0, theme.skyTop);
-            g.addColorStop(1, theme.skyBottom);
-            ctx.fillStyle = g;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            g.addColorStop(0, theme.skyTop); g.addColorStop(1, theme.skyBottom);
+            ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
             if (theme.hasStars) {
                 ctx.fillStyle = 'white';
-                for (let i = 0; i < 20; i++) {
+                for (let i = 0; i < 15; i++) {
                     const tw = Math.sin(frame * 0.1 + i) * 0.5 + 0.5;
                     ctx.globalAlpha = tw;
                     ctx.beginPath();
-                    ctx.arc(
-                        (i * 37) % canvas.width,
-                        (i * 23) % (canvas.height * 0.6),
-                        1 + tw, 0, Math.PI * 2
-                    );
+                    ctx.arc((i * 37) % canvas.width, (i * 23) % (canvas.height * 0.6), 1 + tw, 0, Math.PI * 2);
                     ctx.fill();
                 }
                 ctx.globalAlpha = 1;
             }
-            if (theme.hasSun) {
-                ctx.fillStyle = theme.sunColor;
-                ctx.beginPath();
-                ctx.arc(canvas.width - 35, 35, 18, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            if (theme.hasMoon) {
-                ctx.fillStyle = theme.moonColor;
-                ctx.beginPath();
-                ctx.arc(canvas.width - 35, 35, 15, 0, Math.PI * 2);
-                ctx.fill();
-            }
+            if (theme.hasSun) { ctx.fillStyle = theme.sunColor; ctx.beginPath(); ctx.arc(canvas.width - 35, 35, 18, 0, Math.PI * 2); ctx.fill(); }
+            if (theme.hasMoon) { ctx.fillStyle = theme.moonColor; ctx.beginPath(); ctx.arc(canvas.width - 35, 35, 15, 0, Math.PI * 2); ctx.fill(); }
             ctx.fillStyle = theme.cloudColor;
             const cx = ((frame * 0.3) % (canvas.width + 50)) - 25;
-            ctx.beginPath();
-            ctx.arc(cx, 50, 10, 0, Math.PI * 2);
-            ctx.arc(cx + 10, 50, 13, 0, Math.PI * 2);
-            ctx.arc(cx + 22, 50, 10, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(cx, 50, 10, 0, Math.PI * 2); ctx.arc(cx + 10, 50, 13, 0, Math.PI * 2); ctx.arc(cx + 22, 50, 10, 0, Math.PI * 2); ctx.fill();
             if (theme.hasTrees) {
                 for (let i = 0; i < 3; i++) {
                     const tx = ((i * 70 + frame * 0.5) % (canvas.width + 50)) - 25;
-                    ctx.fillStyle = theme.pipeMain;
-                    ctx.fillRect(tx, canvas.height - 60, 25, 60);
-                    ctx.fillStyle = theme.pipeDark;
-                    ctx.fillRect(tx - 3, canvas.height - 68, 31, 8);
+                    ctx.fillStyle = theme.pipeMain; ctx.fillRect(tx, canvas.height - 60, 25, 60);
+                    ctx.fillStyle = theme.pipeDark; ctx.fillRect(tx - 3, canvas.height - 68, 31, 8);
                 }
             } else {
                 for (let i = 0; i < 2; i++) {
                     const px = ((i * 100 + frame * 0.5) % (canvas.width + 50)) - 25;
-                    const th = 40 + i * 10;
-                    const by = th + 50;
+                    const th = 40 + i * 10; const by = th + 50;
                     ctx.fillStyle = theme.pipeMain;
-                    ctx.fillRect(px, 0, 25, th);
-                    ctx.fillRect(px, by, 25, canvas.height - by);
+                    ctx.fillRect(px, 0, 25, th); ctx.fillRect(px, by, 25, canvas.height - by);
                     ctx.fillStyle = theme.pipeTop;
-                    ctx.fillRect(px - 3, th - 8, 31, 8);
-                    ctx.fillRect(px - 3, by, 31, 8);
+                    ctx.fillRect(px - 3, th - 8, 31, 8); ctx.fillRect(px - 3, by, 31, 8);
                 }
             }
-            ctx.fillStyle = theme.ground;
-            ctx.fillRect(0, canvas.height - 8, canvas.width, 8);
+            ctx.fillStyle = theme.ground; ctx.fillRect(0, canvas.height - 8, canvas.width, 8);
             frame++;
             this.themePreviewAnimIds.set(canvas, requestAnimationFrame(render));
         };
@@ -1044,8 +1002,7 @@ class FlappyGame {
             this.menuCtx.clearRect(0, 0, this.menuCanvas.width, this.menuCanvas.height);
             const theme = THEMES[gameState.theme] || THEMES.day;
             const g = this.menuCtx.createLinearGradient(0, 0, 0, this.menuCanvas.height);
-            g.addColorStop(0, theme.skyTop);
-            g.addColorStop(1, theme.skyBottom);
+            g.addColorStop(0, theme.skyTop); g.addColorStop(1, theme.skyBottom);
             this.menuCtx.fillStyle = g;
             this.menuCtx.fillRect(0, 0, this.menuCanvas.width, this.menuCanvas.height);
             if (theme.hasSun) {
@@ -1110,41 +1067,22 @@ class FlappyGame {
             if (k === gameState.currentSkin) card.classList.add('selected');
             const p = document.createElement('canvas');
             p.className = 'skin-preview';
-            p.width = 80;
-            p.height = 80;
+            p.width = 80; p.height = 80;
             canvases.push({ canvas: p, skinKey: k });
             card.appendChild(p);
-            const n = document.createElement('div');
-            n.className = 'skin-name';
-            n.textContent = skin.name;
-            card.appendChild(n);
-            const pr = document.createElement('div');
-            pr.className = 'skin-price';
-            pr.textContent = skin.price === 0 ? T.free : `🪙 ${skin.price}`;
-            card.appendChild(pr);
-            const btn = document.createElement('button');
-            btn.className = 'skin-btn';
+            const n = document.createElement('div'); n.className = 'skin-name'; n.textContent = skin.name; card.appendChild(n);
+            const pr = document.createElement('div'); pr.className = 'skin-price';
+            pr.textContent = skin.price === 0 ? T.free : `🪙 ${skin.price}`; card.appendChild(pr);
+            const btn = document.createElement('button'); btn.className = 'skin-btn';
             if (k === gameState.currentSkin) {
-                btn.textContent = T.selected;
-                btn.classList.add('selected');
-                btn.disabled = true;
+                btn.textContent = T.selected; btn.classList.add('selected'); btn.disabled = true;
             } else if (gameState.ownedSkins.includes(k)) {
-                btn.textContent = T.select;
-                btn.classList.add('select');
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.selectSkin(k);
-                });
+                btn.textContent = T.select; btn.classList.add('select');
+                btn.addEventListener('click', (e) => { e.stopPropagation(); this.selectSkin(k); });
             } else {
-                btn.textContent = `${T.buy} 🪙${skin.price}`;
-                btn.classList.add('buy');
+                btn.textContent = `${T.buy} 🪙${skin.price}`; btn.classList.add('buy');
                 if (gameState.coins < skin.price) btn.disabled = true;
-                else {
-                    btn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        this.buySkin(k);
-                    });
-                }
+                else btn.addEventListener('click', (e) => { e.stopPropagation(); this.buySkin(k); });
             }
             card.appendChild(btn);
             grid.appendChild(card);
@@ -1154,33 +1092,26 @@ class FlappyGame {
 
     startAllSkinPreviews(canvases) {
         const ctxs = canvases.map(({ canvas, skinKey }) => ({
-            ctx: canvas.getContext('2d'),
+            ctx: canvas.getContext('2d', { alpha: false }),
             canvas,
             skinKey
         }));
         let frame = 0;
         const render = () => {
             const ss = document.getElementById('skinsScreen');
-            if (!ss || !ss.classList.contains('active')) {
-                this.skinPreviewAnimId = null;
-                return;
-            }
+            if (!ss || !ss.classList.contains('active')) { this.skinPreviewAnimId = null; return; }
             ctxs.forEach(({ ctx, canvas, skinKey }) => {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 const theme = THEMES[gameState.theme] || THEMES.day;
                 const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
-                g.addColorStop(0, theme.skyTop);
-                g.addColorStop(1, theme.skyBottom);
-                ctx.fillStyle = g;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                g.addColorStop(0, theme.skyTop); g.addColorStop(1, theme.skyBottom);
+                ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.save();
                 ctx.translate(canvas.width / 2, canvas.height / 2);
                 ctx.scale(1.4, 1.4);
-                const oc = this.ctx;
-                this.ctx = ctx;
+                const oc = this.ctx; this.ctx = ctx;
                 try { this.drawSkin(frame * 0.08, skinKey); } catch (e) {}
-                this.ctx = oc;
-                ctx.restore();
+                this.ctx = oc; ctx.restore();
             });
             frame++;
             this.skinPreviewAnimId = requestAnimationFrame(render);
@@ -1406,7 +1337,9 @@ class FlappyGame {
     }
 
     addParticles(x, y, color) {
-        for (let i = 0; i < 12; i++) {
+        // 🔧 На мобильных меньше частиц
+        const count = DeviceInfo.isLowEnd ? 6 : 12;
+        for (let i = 0; i < count; i++) {
             this.particles.push({
                 x, y,
                 vx: (Math.random() - 0.5) * 5,
@@ -1475,13 +1408,19 @@ class FlappyGame {
         });
     }
 
+    // 🔧 ОПТИМИЗИРОВАННЫЙ РЕНДЕР
     render() {
         const theme = THEMES[gameState.theme] || THEMES.day;
         const ctx = this.ctx;
 
-        const g = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
-        g.addColorStop(0, theme.skyTop);
-        g.addColorStop(1, theme.skyBottom);
+        // 🔧 Кэшированный градиент неба
+        const skyGradKey = `sky_${this.canvas.height}_${theme.skyTop}_${theme.skyBottom}`;
+        const g = this.getCachedGradient(skyGradKey, () => {
+            const grad = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+            grad.addColorStop(0, theme.skyTop);
+            grad.addColorStop(1, theme.skyBottom);
+            return grad;
+        });
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -1500,33 +1439,42 @@ class FlappyGame {
         const celX = this.displayWidth - 80;
         const celY = 100;
         const celR = 35 * this.scale;
+
+        // 🔧 На мобильных упрощённое солнце/луна (без свечения)
         if (theme.hasSun) {
+            if (!DeviceInfo.isLowEnd) {
+                ctx.fillStyle = theme.sunColor;
+                ctx.globalAlpha = 0.3;
+                ctx.beginPath();
+                ctx.arc(celX, celY, celR * 1.4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
             ctx.fillStyle = theme.sunColor;
-            ctx.globalAlpha = 0.3;
-            ctx.beginPath();
-            ctx.arc(celX, celY, celR * 1.4, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.globalAlpha = 1;
             ctx.beginPath();
             ctx.arc(celX, celY, celR, 0, Math.PI * 2);
             ctx.fill();
         }
         if (theme.hasMoon) {
-            ctx.fillStyle = 'rgba(255,250,205,0.15)';
-            ctx.beginPath();
-            ctx.arc(celX, celY, celR * 1.6, 0, Math.PI * 2);
-            ctx.fill();
+            if (!DeviceInfo.isLowEnd) {
+                ctx.fillStyle = 'rgba(255,250,205,0.15)';
+                ctx.beginPath();
+                ctx.arc(celX, celY, celR * 1.6, 0, Math.PI * 2);
+                ctx.fill();
+            }
             ctx.fillStyle = theme.moonColor;
             ctx.beginPath();
             ctx.arc(celX, celY, celR, 0, Math.PI * 2);
             ctx.fill();
-            ctx.fillStyle = 'rgba(0,0,0,0.15)';
-            ctx.beginPath();
-            ctx.arc(celX - 8 * this.scale, celY - 5 * this.scale, 5 * this.scale, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(celX + 10 * this.scale, celY + 5 * this.scale, 3 * this.scale, 0, Math.PI * 2);
-            ctx.fill();
+            if (!DeviceInfo.isLowEnd) {
+                ctx.fillStyle = 'rgba(0,0,0,0.15)';
+                ctx.beginPath();
+                ctx.arc(celX - 8 * this.scale, celY - 5 * this.scale, 5 * this.scale, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(celX + 10 * this.scale, celY + 5 * this.scale, 3 * this.scale, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
 
         ctx.save();
@@ -1557,16 +1505,23 @@ class FlappyGame {
             const darkColor = theme.hasStars ? 'rgba(5,8,20,0.7)' :
                               theme.skyTop === '#FF6B9D' ? 'rgba(80,20,40,0.5)' :
                               theme.hasTrees ? 'rgba(30,60,40,0.5)' : 'rgba(100,160,200,0.4)';
-            const leftGrad = ctx.createLinearGradient(0, 0, this.offsetX, 0);
-            leftGrad.addColorStop(0, darkColor);
-            leftGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            const leftGradKey = `left_${this.offsetX}_${darkColor}`;
+            const leftGrad = this.getCachedGradient(leftGradKey, () => {
+                const grad = ctx.createLinearGradient(0, 0, this.offsetX, 0);
+                grad.addColorStop(0, darkColor);
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+                return grad;
+            });
             ctx.fillStyle = leftGrad;
             ctx.fillRect(0, 0, this.offsetX, this.canvas.height);
-            const rightGrad = ctx.createLinearGradient(
-                this.displayWidth - this.offsetX, 0, this.displayWidth, 0
-            );
-            rightGrad.addColorStop(0, 'rgba(0,0,0,0)');
-            rightGrad.addColorStop(1, darkColor);
+
+            const rightGradKey = `right_${this.offsetX}_${darkColor}`;
+            const rightGrad = this.getCachedGradient(rightGradKey, () => {
+                const grad = ctx.createLinearGradient(this.displayWidth - this.offsetX, 0, this.displayWidth, 0);
+                grad.addColorStop(0, 'rgba(0,0,0,0)');
+                grad.addColorStop(1, darkColor);
+                return grad;
+            });
             ctx.fillStyle = rightGrad;
             ctx.fillRect(this.displayWidth - this.offsetX, 0, this.offsetX, this.canvas.height);
         }
@@ -1616,10 +1571,15 @@ class FlappyGame {
             this.drawTree(pipe.x, pipe.bottomY, this.VIRTUAL_HEIGHT - pipe.bottomY, false, theme);
             return;
         }
-        const g = ctx.createLinearGradient(pipe.x, 0, pipe.x + this.pipeWidth, 0);
-        g.addColorStop(0, theme.pipeMain);
-        g.addColorStop(0.5, theme.pipeLight);
-        g.addColorStop(1, theme.pipeMain);
+        // 🔧 Кэшированный градиент трубы
+        const pipeGradKey = `pipe_${this.pipeWidth}_${theme.pipeMain}_${theme.pipeLight}`;
+        const g = this.getCachedGradient(pipeGradKey, () => {
+            const grad = ctx.createLinearGradient(pipe.x, 0, pipe.x + this.pipeWidth, 0);
+            grad.addColorStop(0, theme.pipeMain);
+            grad.addColorStop(0.5, theme.pipeLight);
+            grad.addColorStop(1, theme.pipeMain);
+            return grad;
+        });
         ctx.fillStyle = g;
         ctx.fillRect(pipe.x, 0, this.pipeWidth, pipe.topHeight);
         ctx.fillRect(pipe.x, pipe.bottomY, this.pipeWidth, this.VIRTUAL_HEIGHT - pipe.bottomY);
@@ -1645,29 +1605,32 @@ class FlappyGame {
             ctx.fillStyle = tg;
             ctx.fillRect(x, y, this.pipeWidth, height);
 
-            ctx.strokeStyle = theme.pipeDark;
-            ctx.lineWidth = 1;
-            ctx.globalAlpha = 0.4;
-            for (let i = 1; i < 4; i++) {
-                const lx = x + (this.pipeWidth / 4) * i;
-                ctx.beginPath();
-                ctx.moveTo(lx, y);
-                ctx.lineTo(lx, y + height);
-                ctx.stroke();
+            // 🔧 На мобильных пропускаем детали дерева
+            if (!DeviceInfo.isLowEnd) {
+                ctx.strokeStyle = theme.pipeDark;
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = 0.4;
+                for (let i = 1; i < 4; i++) {
+                    const lx = x + (this.pipeWidth / 4) * i;
+                    ctx.beginPath();
+                    ctx.moveTo(lx, y);
+                    ctx.lineTo(lx, y + height);
+                    ctx.stroke();
+                }
+                const steps = Math.floor(height / 25);
+                for (let i = 0; i < steps; i++) {
+                    const iy = y + i * 25;
+                    ctx.beginPath();
+                    ctx.moveTo(x, iy);
+                    ctx.bezierCurveTo(
+                        x + this.pipeWidth * 0.3, iy + 3,
+                        x + this.pipeWidth * 0.7, iy - 3,
+                        x + this.pipeWidth, iy
+                    );
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = 1;
             }
-            const steps = Math.floor(height / 25);
-            for (let i = 0; i < steps; i++) {
-                const iy = y + i * 25;
-                ctx.beginPath();
-                ctx.moveTo(x, iy);
-                ctx.bezierCurveTo(
-                    x + this.pipeWidth * 0.3, iy + 3,
-                    x + this.pipeWidth * 0.7, iy - 3,
-                    x + this.pipeWidth, iy
-                );
-                ctx.stroke();
-            }
-            ctx.globalAlpha = 1;
             ctx.strokeStyle = theme.pipeDark;
             ctx.lineWidth = 2;
             ctx.strokeRect(x, y, this.pipeWidth, height);
@@ -1685,20 +1648,22 @@ class FlappyGame {
             ctx.lineWidth = 2;
             ctx.strokeRect(capX, capY, capW, capH);
 
-            ctx.fillStyle = '#388E3C';
-            for (let i = 0; i < 4; i++) {
-                const lx = capX + (capW / 5) * (i + 1);
-                const lby = topDown ? capY + capH : capY;
-                const tipY = topDown ? lby + 10 : lby - 10;
-                ctx.beginPath();
-                ctx.moveTo(lx, lby);
-                ctx.quadraticCurveTo(lx - 6, (lby + tipY) / 2, lx, tipY);
-                ctx.quadraticCurveTo(lx + 6, (lby + tipY) / 2, lx, lby);
-                ctx.closePath();
-                ctx.fill();
+            if (!DeviceInfo.isLowEnd) {
+                ctx.fillStyle = '#388E3C';
+                for (let i = 0; i < 4; i++) {
+                    const lx = capX + (capW / 5) * (i + 1);
+                    const lby = topDown ? capY + capH : capY;
+                    const tipY = topDown ? lby + 10 : lby - 10;
+                    ctx.beginPath();
+                    ctx.moveTo(lx, lby);
+                    ctx.quadraticCurveTo(lx - 6, (lby + tipY) / 2, lx, tipY);
+                    ctx.quadraticCurveTo(lx + 6, (lby + tipY) / 2, lx, lby);
+                    ctx.closePath();
+                    ctx.fill();
+                }
             }
 
-            if (height > 60) {
+            if (height > 60 && !DeviceInfo.isLowEnd) {
                 ctx.fillStyle = '#558B2F';
                 ctx.globalAlpha = 0.6;
                 const ms = (Math.floor(x) % 2 === 0) ? 0 : this.pipeWidth - 8;
@@ -1984,9 +1949,11 @@ class FlappyGame {
 
     drawRocket(t) {
         const ctx = this.ctx;
-        for (let i = 0; i < 10; i++) {
-            const a = Math.max(0, 0.8 - i * 0.08);
-            const r = Math.max(1, 8 - i * 0.5);
+        // 🔧 На мобильных меньше частиц пламени
+        const trailCount = DeviceInfo.isLowEnd ? 5 : 10;
+        for (let i = 0; i < trailCount; i++) {
+            const a = Math.max(0, 0.8 - i * 0.1);
+            const r = Math.max(1, 8 - i * 0.7);
             const g = ctx.createRadialGradient(-22 - i * 4, 0, 0, -22 - i * 4, 0, r);
             g.addColorStop(0, `rgba(255,255,200,${a})`);
             g.addColorStop(0.5, `rgba(255,150,0,${a * 0.7})`);
@@ -2067,7 +2034,9 @@ class FlappyGame {
 
     drawGoldBird(t) {
         const ctx = this.ctx;
-        for (let i = 0; i < 12; i++) {
+        // 🔧 На мобильных меньше бликов
+        const sparkles = DeviceInfo.isLowEnd ? 6 : 12;
+        for (let i = 0; i < sparkles; i++) {
             const a = t * 2 + (i * Math.PI / 6);
             const r = 22 + Math.sin(t * 4 + i) * 4;
             const x = Math.cos(a) * r;
@@ -2078,20 +2047,22 @@ class FlappyGame {
             ctx.arc(x, y, 2.5, 0, Math.PI * 2);
             ctx.fill();
         }
-        for (let i = 0; i < 6; i++) {
-            const sx = Math.cos(t * 7 + i) * 18;
-            const sy = Math.sin(t * 7 + i * 1.5) * 18;
-            const sa = (Math.sin(t * 10 + i * 3) + 1) / 2;
-            ctx.strokeStyle = `rgba(255,255,255,${sa})`;
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(sx - 3, sy);
-            ctx.lineTo(sx + 3, sy);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(sx, sy - 3);
-            ctx.lineTo(sx, sy + 3);
-            ctx.stroke();
+        if (!DeviceInfo.isLowEnd) {
+            for (let i = 0; i < 6; i++) {
+                const sx = Math.cos(t * 7 + i) * 18;
+                const sy = Math.sin(t * 7 + i * 1.5) * 18;
+                const sa = (Math.sin(t * 10 + i * 3) + 1) / 2;
+                ctx.strokeStyle = `rgba(255,255,255,${sa})`;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(sx - 3, sy);
+                ctx.lineTo(sx + 3, sy);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(sx, sy - 3);
+                ctx.lineTo(sx, sy + 3);
+                ctx.stroke();
+            }
         }
         const bg = ctx.createRadialGradient(-4, -4, 0, 0, 0, 16);
         bg.addColorStop(0, '#FFF5B0');

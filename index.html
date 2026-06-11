@@ -14,14 +14,19 @@
     <div class="rotate-overlay" id="rotateOverlay">
         <div class="rotate-content">
             <div class="rotate-phone">
-                <div class="phone-icon">📱</div>
-                <div class="rotate-arrow"></div>
+                <div class="phone-body">
+                    <div class="phone-screen"></div>
+                    <div class="phone-button"></div>
+                </div>
+                <div class="rotate-arrow">
+                    <svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M30 5 A25 25 0 1 1 5 30" fill="none" stroke="#FFD700" stroke-width="4" stroke-linecap="round"/>
+                        <polygon points="5,20 5,35 15,27" fill="#FFD700"/>
+                    </svg>
+                </div>
             </div>
             <div class="rotate-title">Поверните устройство</div>
-            <div class="rotate-subtitle">
-                Для лучшего игрового опыта<br>
-                используйте горизонтальный режим
-            </div>
+            <div class="rotate-subtitle">Для лучшего игрового опыта<br>используйте горизонтальный режим</div>
             <div class="rotate-hint">
                 <div class="hint-dot"></div>
                 <div class="hint-dot"></div>
@@ -75,18 +80,9 @@
     <div id="deathScreen" class="screen" data-depth="3">
         <h2 class="screen-title">Игра окончена</h2>
         <div id="finalStats">
-            <div class="stat-row">
-                <span>Счёт:</span>
-                <strong id="finalScore">0</strong>
-            </div>
-            <div class="stat-row highlight">
-                <span>Заработано монет:</span>
-                <strong id="earnedCoins">0</strong>
-            </div>
-            <div class="stat-row">
-                <span>Лучший результат:</span>
-                <strong id="bestScore">0</strong>
-            </div>
+            <div class="stat-row"><span>Счёт:</span><strong id="finalScore">0</strong></div>
+            <div class="stat-row highlight"><span>Заработано монет:</span><strong id="earnedCoins">0</strong></div>
+            <div class="stat-row"><span>Лучший результат:</span><strong id="bestScore">0</strong></div>
         </div>
         <div class="menu-buttons">
             <button id="restartBtn" class="menu-btn primary">Играть снова</button>
@@ -99,9 +95,7 @@
             <button class="back-btn" data-target="menuScreen">← Назад</button>
         </div>
         <h2 class="screen-title">Таблица рекордов</h2>
-        <div id="leaderboard">
-            <ul id="leaderboardList"></ul>
-        </div>
+        <div id="leaderboard"><ul id="leaderboardList"></ul></div>
     </div>
 
     <div id="settingsScreen" class="screen" data-depth="1">
@@ -117,20 +111,14 @@
             <div class="settings-section">
                 <h3 class="section-title">🔊 Звук</h3>
                 <div class="sound-control">
-                    <div class="sound-label">
-                        <span>🎵 Музыка</span>
-                        <span id="musicValue" class="sound-value">70%</span>
-                    </div>
+                    <div class="sound-label"><span>🎵 Музыка</span><span id="musicValue" class="sound-value">70%</span></div>
                     <div class="slider-row">
                         <button id="musicToggle" class="mute-btn">🎵</button>
                         <input type="range" id="musicSlider" class="styled-slider" min="0" max="100" value="70">
                     </div>
                 </div>
                 <div class="sound-control">
-                    <div class="sound-label">
-                        <span>🔔 Звуковые эффекты</span>
-                        <span id="sfxValue" class="sound-value">80%</span>
-                    </div>
+                    <div class="sound-label"><span>🔔 Эффекты</span><span id="sfxValue" class="sound-value">80%</span></div>
                     <div class="slider-row">
                         <button id="sfxToggle" class="mute-btn">🔔</button>
                         <input type="range" id="sfxSlider" class="styled-slider" min="0" max="100" value="80">
