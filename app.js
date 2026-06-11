@@ -748,17 +748,17 @@ class FlappyGame {
 
   // ✅ ИСПРАВЛЕНИЕ: Используем getBoundingClientRect для точного размера canvas
   // Это решает проблему полос сверху/снизу на мобильных браузерах из-за плавающей адресной строки
+
   resizeCanvas() {
-    if (!this.canvas) return;
-    const rect = this.canvas.getBoundingClientRect();
-    this.displayWidth = rect.width;
-    this.displayHeight = rect.height;
-    
     const dpr = Math.min(window.devicePixelRatio || 1, DeviceInfo.isLowEnd ? 1.5 : 2);
+    
+    // ✅ ИСПРАВЛЕНИЕ: Используем visualViewport для точного размера на мобильных
+    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    this.displayWidth = window.innerWidth;
+    this.displayHeight = vh;
+    
     this.canvas.width = this.displayWidth * dpr;
     this.canvas.height = this.displayHeight * dpr;
-    
-    // Синхронизируем CSS размеры, чтобы избежать рассинхронизации
     this.canvas.style.width = this.displayWidth + 'px';
     this.canvas.style.height = this.displayHeight + 'px';
 
@@ -1112,7 +1112,7 @@ class FlappyGame {
 
   resetGame() {
     // ✅ ИСПРАВЛЕНИЕ: Сдвиг птицы правее на мобильных, чтобы крупные скины не обрезались слева
-    const birdX = DeviceInfo.isMobile ? 90 : 80;
+    const birdX = DeviceInfo.isMobile ? 100 : 80;
     this.bird = { x: birdX, y: 300, velocity: 0, radius: 15 };
     this.pipes = [];
     this.coins = [];
@@ -1691,21 +1691,21 @@ class FlappyGame {
     ctx.restore();
   }
 
+
   drawBird() {
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(this.bird.x, this.bird.y);
     
-    // ✅ ИСПРАВЛЕНИЕ: Масштабирование крупных скинов на мобильных устройствах
-    // чтобы они не обрезались краями экрана
+    // ✅ ИСПРАВЛЕНИЕ: Уменьшаем крупные скины пропорционально только на мобильных
     const largeSkins = ['dragon', 'rocket', 'plane'];
     if (DeviceInfo.isMobile && largeSkins.includes(gameState.currentSkin)) {
-      ctx.scale(0.85, 0.85); // Уменьшаем на 15%
+        ctx.scale(0.75, 0.75); 
     }
 
     let angle = 0;
     if (this.gameStarted) {
-      angle = Math.max(-0.5, Math.min(0.8, this.bird.velocity / 600));
+        angle = Math.max(-0.5, Math.min(0.8, this.bird.velocity / 600));
     }
     ctx.rotate(angle);
     try { this.drawSkin(this.gameTime * 3, gameState.currentSkin); }
