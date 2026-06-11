@@ -1266,13 +1266,13 @@ class FlappyGame {
         let min, max;
         
         if (DeviceInfo.isMobile) {
-            // 📱 МОБИЛЬНЫЙ: верхняя труба уходит за край, нижняя не слишком низко
-            min = 0;  // Верхняя труба уходит за край на 30px
-            max = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - 100;  // Нижняя труба минимум 100px над землёй
+            // 📱 МОБИЛЬНЫЙ: верхняя труба уходит за край, но её нижний край всегда виден
+            min = 10;  // Минимум 10px верхней трубы видно (труба рисуется от -100 до 10)
+            max = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - 80;  // Нижняя труба минимум 80px над землёй
         } else {
-            // 💻 ПК: обе трубы всегда видны
-            min = 50;  // Верхняя труба минимум 50px видна
-            max = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - 50;  // Нижняя труба минимум 50px видна
+            // 💻 ПК: обе трубы всегда хорошо видны
+            min = 50;
+            max = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - 50;
         }
         
         const top = Math.random() * (max - min) + min;
