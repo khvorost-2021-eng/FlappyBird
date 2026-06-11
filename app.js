@@ -1262,14 +1262,20 @@ class FlappyGame {
     addPipe() {
         const theme = THEMES[gameState.theme] || THEMES.day;
         const groundHeight = theme.hasTrees ? 15 : 10;
-        const minVisible = 50;  // Минимум 50px трубы видно на экране
         
-        // Верхняя труба: минимум minVisible px видно сверху
-        const minTop = minVisible;
-        // Нижняя труба: минимум minVisible px видно сверху земли
-        const maxTop = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - minVisible;
+        let min, max;
         
-        const top = Math.random() * (maxTop - minTop) + minTop;
+        if (DeviceInfo.isMobile) {
+            // 📱 МОБИЛЬНЫЙ: верхняя труба уходит за край, нижняя не слишком низко
+            min = -30;  // Верхняя труба уходит за край на 30px
+            max = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - 100;  // Нижняя труба минимум 100px над землёй
+        } else {
+            // 💻 ПК: обе трубы всегда видны
+            min = 50;  // Верхняя труба минимум 50px видна
+            max = this.VIRTUAL_HEIGHT - this.pipeGap - groundHeight - 50;  // Нижняя труба минимум 50px видна
+        }
+        
+        const top = Math.random() * (max - min) + min;
         this.pipes.push({
             x: this.visibleRight + 50,
             topHeight: top,
